@@ -9,6 +9,9 @@ const pool = require('./db');
 
 const authRoutes = require('./routes/auth');
 const postRoutes = require('./routes/posts');
+const userRoutes = require('./routes/users');
+const notificationRoutes = require('./routes/notifications');
+const searchRoutes = require('./routes/search');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,6 +22,9 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/search', searchRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
