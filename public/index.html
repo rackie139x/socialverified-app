@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SocialVerified</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#818CF8', accent: '#EC4899', dark: '#1F2937' } } } }
+</script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
+    .page { display: none; } .page.active { display: block; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; }
+    .modal-overlay.show { display: flex; }
+    .modal-box { background: white; border-radius: 12px; padding: 30px; max-width: 440px; width: 100%; }
+    .notification { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 2100; transform: translateX(200%); transition: transform .3s ease; max-width: 320px; }
+    .notification.show { transform: translateX(0); }
+    .post-image { max-height: 400px; width: 100%; object-fit: cover; border-radius: 8px; }
+    .like-btn.liked { color: #ef4444; }
+    .chat-container { position: fixed; bottom: 96px; right: 20px; width: 340px; max-width: calc(100vw - 32px); height: 460px; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; z-index: 1000; transform: translateY(20px); opacity: 0; visibility: hidden; transition: all .3s ease; }
+    .chat-container.active { transform: translateY(0); opacity: 1; visibility: visible; }
+    .chat-header { padding: 14px 16px; background: linear-gradient(135deg,#4F46E5,#818CF8); color: white; border-radius: 16px 16px 0 0; display:flex; justify-content:space-between; align-items:center; }
+    .chat-messages { flex:1; padding:16px; overflow-y:auto; background:#f9fafb; }
+    .message { margin-bottom:12px; max-width:80%; }
+    .received { background:#e5e7eb; border-radius:18px 18px 18px 4px; padding:10px 14px; }
+    .sent { background:#4F46E5; color:white; border-radius:18px 18px 4px 18px; padding:10px 14px; margin-left:auto; }
+    .chat-toggle { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; background:#4F46E5; color:white; border:none; border-radius:50%; cursor:pointer; z-index:999; font-size:22px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="bg-white shadow-lg sticky top-0 z-50">
+    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-2 cursor-pointer" onclick="showPage('feed')">
+            <div class="w-10 h-10 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                <i class="fas fa-crown text-white text-xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-dark">Social<span class="text-primary">Verified</span></h1>
+        </div>
+        <div id="authArea" class="flex items-center space-x-3">
+            <button onclick="openModal('authModal')" id="signInBtn" class="bg-primary text-white px-4 py-2 rounded-full font-medium hover:bg-indigo-700">Sign In</button>
+        </div>
+    </div>
+</header>
+
+<main class="container mx-auto px-4 py-8">
+    <section id="feedPage" class="page active">
+        <div class="max-w-2xl mx-auto">
+            <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
+                <textarea id="newPostText" placeholder="What's on your mind?" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
+                <input type="file" id="newPostImage" accept="image/*" class="mt-2 text-sm">
+                <div class="flex justify-end mt-3">
+                    <button onclick="createPost()" class="bg-primary text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700">Post</button>
+                </div>
+            </div>
+            <div id="signedOutNotice" class="bg-white rounded-2xl shadow p-5 mb-6 text-center text-gray-500">
+                <a class="text-primary font-medium cursor-pointer" onclick="openModal('authModal')">Sign in</a> to post, like, and comment.
+            </div>
+            <div id="postsContainer" class="space-y-6"></div>
+        </div>
+    </section>
+</main>
+
+<!-- Auth Modal -->
+<div id="authModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold" id="authTitle">Sign In</h3>
+            <button onclick="closeModal('authModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="signupNameField" class="hidden">
+            <input id="authName" type="text" placeholder="Display name" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+        </div>
+        <input id="authEmail" type="email" placeholder="Email" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+        <input id="authPassword" type="password" placeholder="Password (min 8 characters)" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+        <button onclick="submitAuth()" id="authSubmitBtn" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700 mb-2">Sign In</button>
+        <p class="text-sm text-center text-gray-500">
+            <span id="authToggleText">Don't have an account?</span>
+            <a class="text-primary font-medium cursor-pointer" onclick="toggleAuthMode()" id="authToggleLink">Sign up</a>
+        </p>
+    </div>
+</div>
+
+<div class="chat-container" id="chatContainer">
+    <div class="chat-header">
+        <h4 class="font-bold">Messages</h4>
+        <button onclick="toggleChat()" class="text-white text-xl leading-none">&times;</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="flex p-3 border-t">
+        <input id="chatInputField" type="text" placeholder="Message user ID 1..." class="flex-1 border border-gray-300 rounded-full px-4 py-2" onkeydown="if(event.key==='Enter') sendChatMessage()">
+        <button onclick="sendChatMessage()" class="ml-2 bg-primary text-white w-10 h-10 rounded-full"><i class="fas fa-paper-plane"></i></button>
+    </div>
+</div>
+<button class="chat-toggle" onclick="toggleChat()"><i class="fas fa-comment-dots"></i></button>
+<div id="notificationRoot"></div>
+
+<script>
+const API = '';
+let token = localStorage.getItem('sv_token');
+let currentUser = null;
+let authMode = 'login';
+let socket = null;
+
+function openModal(id){ document.getElementById(id).classList.add('show'); }
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+function showPage(name){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(name+'Page').classList.add('active'); }
+
+function showNotification(msg, type='success'){
+    const colors = { success:'#10b981', error:'#ef4444', info:'#4F46E5' };
+    const el = document.createElement('div');
+    el.className = 'notification';
+    el.style.background = colors[type] || colors.info;
+    el.textContent = msg;
+    document.getElementById('notificationRoot').appendChild(el);
+    requestAnimationFrame(()=>el.classList.add('show'));
+    setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, 3000);
+}
+
+function escapeHtml(str){ const d=document.createElement('div'); d.textContent = str||''; return d.innerHTML; }
+
+async function api(path, options={}) {
+    const headers = { 'Content-Type': 'application/json', ...(options.headers||{}) };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(API + path, { ...options, headers });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+}
+
+function toggleAuthMode(){
+    authMode = authMode === 'login' ? 'signup' : 'login';
+    document.getElementById('authTitle').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+    document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? 'Sign In' : 'Sign Up';
+    document.getElementById('signupNameField').classList.toggle('hidden', authMode !== 'signup');
+    document.getElementById('authToggleText').textContent = authMode === 'login' ? "Don't have an account?" : 'Already have an account?';
+    document.getElementById('authToggleLink').textContent = authMode === 'login' ? 'Sign up' : 'Sign in';
+}
+
+async function submitAuth(){
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const name = document.getElementById('authName').value.trim();
+    try {
+        const payload = authMode === 'login' ? { email, password } : { name, email, password };
+        const data = await api('/api/auth/' + authMode, { method: 'POST', body: JSON.stringify(payload) });
+        token = data.token;
+        localStorage.setItem('sv_token', token);
+        currentUser = data.user;
+        closeModal('authModal');
+        onAuthed();
+        showNotification('Welcome, ' + currentUser.name + '!');
+    } catch (err) {
+        showNotification(err.message, 'error');
+    }
+}
+
+function onAuthed(){
+    document.getElementById('signInBtn').textContent = currentUser.name;
+    document.getElementById('signInBtn').onclick = () => showNotification('Signed in as ' + currentUser.name, 'info');
+    document.getElementById('composer').classList.remove('hidden');
+    document.getElementById('signedOutNotice').classList.add('hidden');
+    connectChat();
+    loadFeed();
+}
+
+async function tryRestoreSession(){
+    if (!token) return loadFeed();
+    try {
+        const data = await api('/api/auth/me');
+        currentUser = data.user;
+        onAuthed();
+    } catch {
+        token = null; localStorage.removeItem('sv_token');
+        loadFeed();
+    }
+}
+
+async function loadFeed(){
+    try {
+        const data = await api('/api/posts');
+        renderPosts(data.posts);
+    } catch (err) {
+        showNotification('Could not load feed', 'error');
+    }
+}
+
+function renderPosts(posts){
+    document.getElementById('postsContainer').innerHTML = posts.map(p => `
+        <div class="bg-white rounded-2xl shadow-lg p-5">
+            <div class="flex items-center mb-3">
+                <div class="w-11 h-11 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center mr-3">
+                    <i class="fas fa-user text-white"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold flex items-center">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary ml-1"></i>' : ''}</h4>
+                    <p class="text-xs text-gray-400">${new Date(p.created_at).toLocaleString()}</p>
+                </div>
+            </div>
+            ${p.text ? `<p class="text-gray-700 mb-3 whitespace-pre-wrap">${escapeHtml(p.text)}</p>` : ''}
+            ${p.image_url ? `<img src="${p.image_url}" class="post-image mb-3">` : ''}
+            <div class="flex items-center justify-between text-gray-500 border-t pt-3">
+                <button class="hover:text-red-500" onclick="toggleLike(${p.id})"><i class="far fa-heart"></i> ${p.like_count}</button>
+                <button class="hover:text-primary" onclick="document.getElementById('c-${p.id}').focus()"><i class="far fa-comment"></i> ${p.comments.length}</button>
+            </div>
+            <div class="mt-3 space-y-2">
+                ${p.comments.map(c => `<div class="bg-gray-50 rounded-lg px-3 py-2 text-sm"><span class="font-semibold">${escapeHtml(c.author_name)}:</span> ${escapeHtml(c.text)}</div>`).join('')}
+            </div>
+            <div class="flex items-center mt-3">
+                <input id="c-${p.id}" type="text" placeholder="Write a comment..." class="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') addComment(${p.id})">
+                <button onclick="addComment(${p.id})" class="ml-2 text-primary font-medium text-sm">Send</button>
+            </div>
+        </div>
+    `).join('') || '<p class="text-center text-gray-400 py-10">No posts yet — be the first!</p>';
+}
+
+async function createPost(){
+    if (!currentUser) return openModal('authModal');
+    const text = document.getElementById('newPostText').value.trim();
+    const fileInput = document.getElementById('newPostImage');
+    const file = fileInput.files[0];
+    if (!text && !file) return showNotification('Write something or add a photo', 'error');
+    try {
+        const form = new FormData();
+        if (text) form.append('text', text);
+        if (file) form.append('image', file);
+        const res = await fetch('/api/posts', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: form });
+        if (!res.ok) throw new Error((await res.json()).error);
+        document.getElementById('newPostText').value = '';
+        fileInput.value = '';
+        showNotification('Posted!');
+        loadFeed();
+    } catch (err) {
+        showNotification(err.message, 'error');
+    }
+}
+
+async function toggleLike(id){
+    if (!currentUser) return openModal('authModal');
+    try { await api(`/api/posts/${id}/like`, { method: 'POST' }); loadFeed(); }
+    catch (err) { showNotification(err.message, 'error'); }
+}
+
+async function addComment(id){
+    if (!currentUser) return openModal('authModal');
+    const input = document.getElementById('c-' + id);
+    const text = input.value.trim();
+    if (!text) return;
+    try {
+        await api(`/api/posts/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+        input.value = '';
+        loadFeed();
+    } catch (err) { showNotification(err.message, 'error'); }
+}
+
+// ---- Chat ----
+function toggleChat(){ document.getElementById('chatContainer').classList.toggle('active'); }
+
+function connectChat(){
+    socket = io({ auth: { token } });
+    socket.on('direct_message', (msg) => {
+        const kind = msg.sender_id === currentUser.id ? 'sent' : 'received';
+        appendChatMessage(msg.text, kind);
+    });
+}
+
+function appendChatMessage(text, kind){
+    const wrap = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = 'message';
+    div.innerHTML = `<div class="${kind}">${escapeHtml(text)}</div>`;
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+function sendChatMessage(){
+    if (!currentUser) return openModal('authModal');
+    const input = document.getElementById('chatInputField');
+    const text = input.value.trim();
+    if (!text) return;
+    // Demo recipient: user ID 1. In a real UI you'd pick a contact first.
+    socket.emit('direct_message', { recipientId: 1, text });
+    input.value = '';
+}
+
+tryRestoreSession();
+</script>
+</body>
+</html>
