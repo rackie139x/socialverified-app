@@ -97,3 +97,17 @@ CREATE TABLE IF NOT EXISTS mutes (
     PRIMARY KEY (muter_id, muted_id),
     CHECK (muter_id != muted_id)
 );
+
+-- These ALTERs exist because CREATE TABLE IF NOT EXISTS above does nothing
+-- if the table already exists from an earlier deploy - it does NOT add new
+-- columns to an existing table. This keeps the schema in sync without
+-- ever dropping or losing existing data.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_photo_url TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_url TEXT;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS repost_of INTEGER REFERENCES posts(id) ON DELETE SET NULL;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS quote_text TEXT;
