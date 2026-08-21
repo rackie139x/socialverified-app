@@ -16,53 +16,110 @@
     .page { display: none; } .page.active { display: block; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; }
     .modal-overlay.show { display: flex; }
-    .modal-box { background: white; border-radius: 12px; padding: 30px; max-width: 440px; width: 100%; }
-    .notification { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 2100; transform: translateX(200%); transition: transform .3s ease; max-width: 320px; }
-    .notification.show { transform: translateX(0); }
-    .post-image { max-height: 400px; width: 100%; object-fit: cover; border-radius: 8px; }
-    .like-btn.liked { color: #ef4444; }
-    .chat-container { position: fixed; bottom: 96px; right: 20px; width: 340px; max-width: calc(100vw - 32px); height: 460px; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; z-index: 1000; transform: translateY(20px); opacity: 0; visibility: hidden; transition: all .3s ease; }
+    .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; }
+    .notification-toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 2100; transform: translateX(200%); transition: transform .3s ease; max-width: 320px; }
+    .notification-toast.show { transform: translateX(0); }
+    .post-image, .post-video { max-height: 420px; width: 100%; object-fit: cover; border-radius: 8px; }
+    .avatar { border-radius: 50%; object-fit: cover; background: linear-gradient(135deg,#4F46E5,#EC4899); display:flex; align-items:center; justify-content:center; color:white; flex-shrink:0; }
+    .cover-photo { height: 160px; width: 100%; object-fit: cover; border-radius: 12px 12px 0 0; background: linear-gradient(135deg,#4F46E5,#818CF8); }
+    .hashtag { color: #4F46E5; cursor: pointer; font-weight: 500; }
+    .tab-btn { padding: 8px 4px; border-bottom: 2px solid transparent; color: #6b7280; font-weight: 500; cursor: pointer; }
+    .tab-btn.active { border-color: #4F46E5; color: #4F46E5; }
+    .badge-dot { position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+    .chat-container { position: fixed; bottom: 96px; right: 20px; width: 340px; max-width: calc(100vw - 32px); height: 480px; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; z-index: 1000; transform: translateY(20px); opacity: 0; visibility: hidden; transition: all .3s ease; }
     .chat-container.active { transform: translateY(0); opacity: 1; visibility: visible; }
-    .chat-header { padding: 14px 16px; background: linear-gradient(135deg,#4F46E5,#818CF8); color: white; border-radius: 16px 16px 0 0; display:flex; justify-content:space-between; align-items:center; }
-    .chat-messages { flex:1; padding:16px; overflow-y:auto; background:#f9fafb; }
-    .message { margin-bottom:12px; max-width:80%; }
-    .received { background:#e5e7eb; border-radius:18px 18px 18px 4px; padding:10px 14px; }
-    .sent { background:#4F46E5; color:white; border-radius:18px 18px 4px 18px; padding:10px 14px; margin-left:auto; }
-    .chat-toggle { position: fixed; bottom: 20px; right: 20px; width: 60px; height: 60px; background:#4F46E5; color:white; border:none; border-radius:50%; cursor:pointer; z-index:999; font-size:22px; }
+    .chat-header { padding: 12px 16px; background: linear-gradient(135deg,#4F46E5,#818CF8); color: white; border-radius: 16px 16px 0 0; display:flex; justify-content:space-between; align-items:center; }
+    .chat-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .contact-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .contact-row:hover { background: #f9fafb; }
+    .chat-messages { flex:1; padding:14px; overflow-y:auto; background:#f9fafb; }
+    .message { margin-bottom:10px; max-width:80%; }
+    .received { background:#e5e7eb; border-radius:18px 18px 18px 4px; padding:8px 12px; }
+    .sent { background:#4F46E5; color:white; border-radius:18px 18px 4px 18px; padding:8px 12px; margin-left:auto; }
+    .chat-toggle { position: fixed; bottom: 20px; right: 20px; width: 58px; height: 58px; background:#4F46E5; color:white; border:none; border-radius:50%; cursor:pointer; z-index:999; font-size:20px; }
+    ::placeholder { color: #9ca3af; }
 </style>
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen pb-10">
 
 <header class="bg-white shadow-lg sticky top-0 z-50">
-    <div class="container mx-auto px-4 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-2 cursor-pointer" onclick="showPage('feed')">
-            <div class="w-10 h-10 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
-                <i class="fas fa-crown text-white text-xl"></i>
+    <div class="container mx-auto px-4 py-3 flex items-center gap-3">
+        <div class="flex items-center space-x-2 cursor-pointer flex-shrink-0" onclick="showFeed()">
+            <div class="w-9 h-9 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                <i class="fas fa-crown text-white text-sm"></i>
             </div>
-            <h1 class="text-2xl font-bold text-dark">Social<span class="text-primary">Verified</span></h1>
+            <h1 class="text-xl font-bold text-dark hidden sm:block">Social<span class="text-primary">Verified</span></h1>
         </div>
-        <div id="authArea" class="flex items-center space-x-3">
-            <button onclick="openModal('authModal')" id="signInBtn" class="bg-primary text-white px-4 py-2 rounded-full font-medium hover:bg-indigo-700">Sign In</button>
+
+        <div class="flex-1 relative">
+            <input id="searchInput" type="text" placeholder="Search people, posts, #hashtags" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') runSearch()">
+        </div>
+
+        <button onclick="openNotifications()" class="relative text-gray-600 hover:text-primary text-xl flex-shrink-0">
+            <i class="far fa-bell"></i>
+            <span id="notifBadge" class="badge-dot hidden">0</span>
+        </button>
+
+        <div id="authArea" class="flex items-center flex-shrink-0">
+            <button onclick="openModal('authModal')" id="signInBtn" class="bg-primary text-white px-4 py-2 rounded-full font-medium hover:bg-indigo-700 text-sm whitespace-nowrap">Sign In</button>
         </div>
     </div>
 </header>
 
-<main class="container mx-auto px-4 py-8">
+<main class="container mx-auto px-4 py-6 max-w-2xl">
+
+    <!-- FEED -->
     <section id="feedPage" class="page active">
-        <div class="max-w-2xl mx-auto">
-            <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
-                <textarea id="newPostText" placeholder="What's on your mind?" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
-                <input type="file" id="newPostImage" accept="image/*" class="mt-2 text-sm">
-                <div class="flex justify-end mt-3">
-                    <button onclick="createPost()" class="bg-primary text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700">Post</button>
+        <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
+            <textarea id="newPostText" placeholder="What's on your mind? Use #hashtags" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
+            <div class="flex items-center justify-between mt-2">
+                <input type="file" id="newPostMedia" accept="image/*,video/*" class="text-sm">
+                <button onclick="createPost()" class="bg-primary text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700">Post</button>
+            </div>
+        </div>
+        <div id="signedOutNotice" class="bg-white rounded-2xl shadow p-5 mb-6 text-center text-gray-500">
+            <a class="text-primary font-medium cursor-pointer" onclick="openModal('authModal')">Sign in</a> to post, like, comment, and follow.
+        </div>
+        <div id="postsContainer" class="space-y-6"></div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="profilePage" class="page">
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+            <img id="profileCover" class="cover-photo" src="" alt="">
+            <div class="p-5 -mt-10">
+                <div class="flex items-end justify-between">
+                    <div id="profileAvatarWrap" class="avatar w-20 h-20 border-4 border-white text-2xl"></div>
+                    <div id="profileActionButtons" class="flex gap-2 mb-1"></div>
+                </div>
+                <h2 id="profileName" class="text-2xl font-bold mt-3 flex items-center gap-1"></h2>
+                <p id="profileBio" class="text-gray-600 mt-1"></p>
+                <div class="flex gap-6 mt-3 text-sm">
+                    <span class="cursor-pointer" onclick="openFollowList('followers')"><b id="followerCount">0</b> Followers</span>
+                    <span class="cursor-pointer" onclick="openFollowList('following')"><b id="followingCount">0</b> Following</span>
                 </div>
             </div>
-            <div id="signedOutNotice" class="bg-white rounded-2xl shadow p-5 mb-6 text-center text-gray-500">
-                <a class="text-primary font-medium cursor-pointer" onclick="openModal('authModal')">Sign in</a> to post, like, and comment.
-            </div>
-            <div id="postsContainer" class="space-y-6"></div>
+        </div>
+        <div id="profilePosts" class="space-y-6"></div>
+    </section>
+
+    <!-- SEARCH RESULTS -->
+    <section id="searchPage" class="page">
+        <div class="flex gap-4 border-b mb-4 bg-white rounded-t-xl px-4 pt-3">
+            <div class="tab-btn active" data-tab="users" onclick="switchSearchTab('users')">People</div>
+            <div class="tab-btn" data-tab="posts" onclick="switchSearchTab('posts')">Posts</div>
+            <div class="tab-btn" data-tab="hashtags" onclick="switchSearchTab('hashtags')">Hashtags</div>
+        </div>
+        <div id="searchResults" class="space-y-3"></div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section id="notificationsPage" class="page">
+        <div class="bg-white rounded-2xl shadow-lg">
+            <div id="notificationsList" class="divide-y"></div>
         </div>
     </section>
+
 </main>
 
 <!-- Auth Modal -->
@@ -85,53 +142,123 @@
     </div>
 </div>
 
+<!-- Edit Profile Modal -->
+<div id="editProfileModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Edit Profile</h3>
+            <button onclick="closeModal('editProfileModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <label class="text-sm font-medium text-gray-600">Name</label>
+        <input id="editName" type="text" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1">
+        <label class="text-sm font-medium text-gray-600">Bio</label>
+        <textarea id="editBio" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1 min-h-[70px]"></textarea>
+        <label class="text-sm font-medium text-gray-600">Profile photo</label>
+        <input id="editAvatarFile" type="file" accept="image/*" class="w-full mb-3 mt-1 text-sm">
+        <label class="text-sm font-medium text-gray-600">Cover photo</label>
+        <input id="editCoverFile" type="file" accept="image/*" class="w-full mb-3 mt-1 text-sm">
+        <label class="flex items-center gap-2 mb-4 text-sm">
+            <input id="editPrivate" type="checkbox"> Private account (people must request to follow)
+        </label>
+        <button onclick="saveProfileEdits()" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700">Save Changes</button>
+    </div>
+</div>
+
+<!-- Follower/Following List Modal -->
+<div id="followListModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold" id="followListTitle">Followers</h3>
+            <button onclick="closeModal('followListModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="followListContent" class="space-y-2"></div>
+    </div>
+</div>
+
+<!-- Share/Quote Modal -->
+<div id="shareModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Share Post</h3>
+            <button onclick="closeModal('shareModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <textarea id="quoteText" placeholder="Add your own thoughts (optional)..." class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[60px] mb-3"></textarea>
+        <button onclick="confirmShare()" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700">Share to your feed</button>
+    </div>
+</div>
+
+<!-- Chat Widget -->
 <div class="chat-container" id="chatContainer">
     <div class="chat-header">
-        <h4 class="font-bold">Messages</h4>
-        <button onclick="toggleChat()" class="text-white text-xl leading-none">&times;</button>
+        <h4 class="font-bold" id="chatHeaderTitle">Messages</h4>
+        <div class="flex items-center gap-2">
+            <button id="chatBackBtn" onclick="showChatContactList()" class="hidden text-white"><i class="fas fa-arrow-left"></i></button>
+            <button onclick="toggleChat()" class="text-white text-xl leading-none">&times;</button>
+        </div>
     </div>
-    <div class="chat-messages" id="chatMessages"></div>
-    <div class="flex p-3 border-t">
-        <input id="chatInputField" type="text" placeholder="Message user ID 1..." class="flex-1 border border-gray-300 rounded-full px-4 py-2" onkeydown="if(event.key==='Enter') sendChatMessage()">
-        <button onclick="sendChatMessage()" class="ml-2 bg-primary text-white w-10 h-10 rounded-full"><i class="fas fa-paper-plane"></i></button>
+    <div class="chat-body">
+        <div id="chatContactList" class="overflow-y-auto"></div>
+        <div id="chatConversation" class="hidden flex-1 flex-col" style="display:none;">
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="flex p-3 border-t">
+                <input id="chatInputField" type="text" placeholder="Type a message..." class="flex-1 border border-gray-300 rounded-full px-4 py-2" onkeydown="if(event.key==='Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()" class="ml-2 bg-primary text-white w-10 h-10 rounded-full"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
     </div>
 </div>
 <button class="chat-toggle" onclick="toggleChat()"><i class="fas fa-comment-dots"></i></button>
-<div id="notificationRoot"></div>
+<div id="toastRoot"></div>
 
 <script>
-const API = '';
 let token = localStorage.getItem('sv_token');
 let currentUser = null;
 let authMode = 'login';
 let socket = null;
+let currentChatContact = null;
+let currentProfileId = null;
+let searchTabData = { users: [], posts: [], hashtags: [] };
+let activeSearchTab = 'users';
 
 function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
-function showPage(name){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(name+'Page').classList.add('active'); }
+function escapeHtml(str){ const d=document.createElement('div'); d.textContent = str||''; return d.innerHTML; }
 
-function showNotification(msg, type='success'){
+function showToast(msg, type='success'){
     const colors = { success:'#10b981', error:'#ef4444', info:'#4F46E5' };
     const el = document.createElement('div');
-    el.className = 'notification';
+    el.className = 'notification-toast';
     el.style.background = colors[type] || colors.info;
     el.textContent = msg;
-    document.getElementById('notificationRoot').appendChild(el);
+    document.getElementById('toastRoot').appendChild(el);
     requestAnimationFrame(()=>el.classList.add('show'));
     setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(),300); }, 3000);
 }
 
-function escapeHtml(str){ const d=document.createElement('div'); d.textContent = str||''; return d.innerHTML; }
+function switchPage(name){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById(name+'Page').classList.add('active');
+}
+function showFeed(){ switchPage('feed'); loadFeed(); }
 
 async function api(path, options={}) {
     const headers = { 'Content-Type': 'application/json', ...(options.headers||{}) };
     if (token) headers['Authorization'] = 'Bearer ' + token;
-    const res = await fetch(API + path, { ...options, headers });
+    const res = await fetch(path, { ...options, headers });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+}
+async function apiForm(path, formData, method='POST') {
+    const headers = {};
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(path, { method, headers, body: formData });
     const data = await res.json().catch(()=>({}));
     if (!res.ok) throw new Error(data.error || 'Request failed');
     return data;
 }
 
+// ---- Auth ----
 function toggleAuthMode(){
     authMode = authMode === 'login' ? 'signup' : 'login';
     document.getElementById('authTitle').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
@@ -153,19 +280,21 @@ async function submitAuth(){
         currentUser = data.user;
         closeModal('authModal');
         onAuthed();
-        showNotification('Welcome, ' + currentUser.name + '!');
-    } catch (err) {
-        showNotification(err.message, 'error');
-    }
+        showToast('Welcome, ' + currentUser.name + '!');
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
 function onAuthed(){
-    document.getElementById('signInBtn').textContent = currentUser.name;
-    document.getElementById('signInBtn').onclick = () => showNotification('Signed in as ' + currentUser.name, 'info');
+    document.getElementById('signInBtn').outerHTML = `
+        <div class="avatar w-9 h-9 text-sm cursor-pointer" id="myAvatarBtn" onclick="viewProfile(${currentUser.id})">
+            ${currentUser.name.charAt(0).toUpperCase()}
+        </div>`;
     document.getElementById('composer').classList.remove('hidden');
     document.getElementById('signedOutNotice').classList.add('hidden');
     connectChat();
     loadFeed();
+    pollNotifications();
+    setInterval(pollNotifications, 20000);
 }
 
 async function tryRestoreSession(){
@@ -180,32 +309,49 @@ async function tryRestoreSession(){
     }
 }
 
+// ---- Feed ----
 async function loadFeed(){
     try {
         const data = await api('/api/posts');
-        renderPosts(data.posts);
-    } catch (err) {
-        showNotification('Could not load feed', 'error');
-    }
+        renderPostList(data.posts, 'postsContainer');
+    } catch { showToast('Could not load feed', 'error'); }
 }
 
-function renderPosts(posts){
-    document.getElementById('postsContainer').innerHTML = posts.map(p => `
+function linkify(text){
+    return escapeHtml(text).replace(/#(\w+)/g, '<span class="hashtag" onclick="viewHashtag(\'$1\')">#$1</span>');
+}
+
+function renderPostCard(p){
+    const isRepost = !!p.repost_of;
+    const original = p.original_post;
+    return `
         <div class="bg-white rounded-2xl shadow-lg p-5">
-            <div class="flex items-center mb-3">
-                <div class="w-11 h-11 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center mr-3">
-                    <i class="fas fa-user text-white"></i>
-                </div>
+            ${isRepost ? `<p class="text-xs text-gray-400 mb-2"><i class="fas fa-retweet mr-1"></i>${escapeHtml(p.author_name)} shared</p>` : ''}
+            <div class="flex items-center mb-3 cursor-pointer" onclick="viewProfile(${p.author_id})">
+                <div class="avatar w-11 h-11 mr-3">${p.author_avatar ? `<img src="${p.author_avatar}" class="w-full h-full rounded-full object-cover">` : escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
                 <div>
                     <h4 class="font-bold flex items-center">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary ml-1"></i>' : ''}</h4>
                     <p class="text-xs text-gray-400">${new Date(p.created_at).toLocaleString()}</p>
                 </div>
             </div>
-            ${p.text ? `<p class="text-gray-700 mb-3 whitespace-pre-wrap">${escapeHtml(p.text)}</p>` : ''}
+            ${p.text ? `<p class="text-gray-700 mb-3 whitespace-pre-wrap">${linkify(p.text)}</p>` : ''}
+            ${p.quote_text ? `<p class="text-gray-700 mb-3 whitespace-pre-wrap">${linkify(p.quote_text)}</p>` : ''}
             ${p.image_url ? `<img src="${p.image_url}" class="post-image mb-3">` : ''}
+            ${p.video_url ? `<video src="${p.video_url}" class="post-video mb-3" controls></video>` : ''}
+            ${isRepost && original ? `
+                <div class="border border-gray-200 rounded-xl p-3 mb-3">
+                    <div class="flex items-center mb-2 cursor-pointer" onclick="viewProfile(${original.author_id})">
+                        <div class="avatar w-7 h-7 mr-2 text-xs">${escapeHtml(original.author_name).charAt(0).toUpperCase()}</div>
+                        <span class="font-semibold text-sm">${escapeHtml(original.author_name)}</span>
+                    </div>
+                    ${original.text ? `<p class="text-sm text-gray-600 mb-2">${linkify(original.text)}</p>` : ''}
+                    ${original.image_url ? `<img src="${original.image_url}" class="post-image">` : ''}
+                    ${original.video_url ? `<video src="${original.video_url}" class="post-video" controls></video>` : ''}
+                </div>` : ''}
             <div class="flex items-center justify-between text-gray-500 border-t pt-3">
                 <button class="hover:text-red-500" onclick="toggleLike(${p.id})"><i class="far fa-heart"></i> ${p.like_count}</button>
                 <button class="hover:text-primary" onclick="document.getElementById('c-${p.id}').focus()"><i class="far fa-comment"></i> ${p.comments.length}</button>
+                <button class="hover:text-green-500" onclick="openShareModal(${p.id})"><i class="fas fa-retweet"></i> ${p.share_count || 0}</button>
             </div>
             <div class="mt-3 space-y-2">
                 ${p.comments.map(c => `<div class="bg-gray-50 rounded-lg px-3 py-2 text-sm"><span class="font-semibold">${escapeHtml(c.author_name)}:</span> ${escapeHtml(c.text)}</div>`).join('')}
@@ -215,34 +361,35 @@ function renderPosts(posts){
                 <button onclick="addComment(${p.id})" class="ml-2 text-primary font-medium text-sm">Send</button>
             </div>
         </div>
-    `).join('') || '<p class="text-center text-gray-400 py-10">No posts yet — be the first!</p>';
+    `;
+}
+
+function renderPostList(posts, containerId){
+    document.getElementById(containerId).innerHTML = posts.map(renderPostCard).join('') || '<p class="text-center text-gray-400 py-10">Nothing here yet.</p>';
 }
 
 async function createPost(){
     if (!currentUser) return openModal('authModal');
     const text = document.getElementById('newPostText').value.trim();
-    const fileInput = document.getElementById('newPostImage');
+    const fileInput = document.getElementById('newPostMedia');
     const file = fileInput.files[0];
-    if (!text && !file) return showNotification('Write something or add a photo', 'error');
+    if (!text && !file) return showToast('Write something or add media', 'error');
     try {
         const form = new FormData();
         if (text) form.append('text', text);
-        if (file) form.append('image', file);
-        const res = await fetch('/api/posts', { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: form });
-        if (!res.ok) throw new Error((await res.json()).error);
+        if (file) form.append('media', file);
+        await apiForm('/api/posts', form);
         document.getElementById('newPostText').value = '';
         fileInput.value = '';
-        showNotification('Posted!');
+        showToast('Posted!');
         loadFeed();
-    } catch (err) {
-        showNotification(err.message, 'error');
-    }
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
 async function toggleLike(id){
     if (!currentUser) return openModal('authModal');
-    try { await api(`/api/posts/${id}/like`, { method: 'POST' }); loadFeed(); }
-    catch (err) { showNotification(err.message, 'error'); }
+    try { await api(`/api/posts/${id}/like`, { method: 'POST' }); refreshCurrentView(); }
+    catch (err) { showToast(err.message, 'error'); }
 }
 
 async function addComment(id){
@@ -252,19 +399,269 @@ async function addComment(id){
     if (!text) return;
     try {
         await api(`/api/posts/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
-        input.value = '';
-        loadFeed();
-    } catch (err) { showNotification(err.message, 'error'); }
+        refreshCurrentView();
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
-// ---- Chat ----
-function toggleChat(){ document.getElementById('chatContainer').classList.toggle('active'); }
+function refreshCurrentView(){
+    const feedActive = document.getElementById('feedPage').classList.contains('active');
+    const profileActive = document.getElementById('profilePage').classList.contains('active');
+    if (feedActive) loadFeed();
+    else if (profileActive && currentProfileId) viewProfile(currentProfileId);
+}
+
+// ---- Share / Repost / Quote ----
+let shareTargetId = null;
+function openShareModal(postId){
+    if (!currentUser) return openModal('authModal');
+    shareTargetId = postId;
+    document.getElementById('quoteText').value = '';
+    openModal('shareModal');
+}
+async function confirmShare(){
+    const quote_text = document.getElementById('quoteText').value.trim();
+    try {
+        await api(`/api/posts/${shareTargetId}/share`, { method: 'POST', body: JSON.stringify({ quote_text: quote_text || undefined }) });
+        closeModal('shareModal');
+        showToast('Shared to your feed!');
+        refreshCurrentView();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Profiles ----
+async function viewProfile(userId){
+    currentProfileId = userId;
+    switchPage('profile');
+    try {
+        const data = await api(`/api/users/${userId}`);
+        const u = data.user;
+        document.getElementById('profileCover').src = u.cover_photo_url || 'https://placehold.co/600x160/4F46E5/FFFFFF?text=';
+        document.getElementById('profileAvatarWrap').innerHTML = u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : u.name.charAt(0).toUpperCase();
+        document.getElementById('profileName').innerHTML = `${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary text-lg"></i>' : ''} ${u.is_private ? '<i class="fas fa-lock text-gray-400 text-sm"></i>' : ''}`;
+        document.getElementById('profileBio').textContent = u.bio || '';
+        document.getElementById('followerCount').textContent = data.follower_count;
+        document.getElementById('followingCount').textContent = data.following_count;
+        renderPostList(data.posts.map(p => ({ ...p, author_id: u.id, author_name: u.name, author_avatar: u.avatar_url, is_verified: u.is_verified, comments: p.comments || [] })), 'profilePosts');
+
+        const actionsEl = document.getElementById('profileActionButtons');
+        if (currentUser && currentUser.id === u.id) {
+            actionsEl.innerHTML = `<button onclick="openEditProfile()" class="border-2 border-primary text-primary px-4 py-2 rounded-full text-sm font-medium">Edit Profile</button>`;
+        } else if (currentUser) {
+            const statusData = await api(`/api/users/${userId}/follow-status`);
+            actionsEl.innerHTML = renderFollowButton(userId, statusData.status);
+        } else {
+            actionsEl.innerHTML = '';
+        }
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+function renderFollowButton(userId, status){
+    const map = {
+        following: { label: 'Following', cls: 'bg-gray-200 text-gray-700' },
+        requested: { label: 'Requested', cls: 'bg-gray-200 text-gray-700' },
+        none: { label: 'Follow', cls: 'bg-primary text-white' }
+    };
+    const s = map[status] || map.none;
+    return `<button onclick="toggleFollow(${userId})" class="${s.cls} px-5 py-2 rounded-full text-sm font-bold">${s.label}</button>`;
+}
+
+async function toggleFollow(userId){
+    try {
+        await api(`/api/users/${userId}/follow`, { method: 'POST' });
+        viewProfile(userId);
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function openFollowList(type){
+    if (!currentProfileId) return;
+    document.getElementById('followListTitle').textContent = type === 'followers' ? 'Followers' : 'Following';
+    try {
+        const data = await api(`/api/users/${currentProfileId}/${type}`);
+        const list = data[type] || [];
+        document.getElementById('followListContent').innerHTML = list.map(u => `
+            <div class="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg" onclick="closeModal('followListModal'); viewProfile(${u.id})">
+                <div class="avatar w-10 h-10">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                <span class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary text-xs"></i>' : ''}</span>
+            </div>
+        `).join('') || '<p class="text-gray-400 text-sm text-center py-4">Nobody yet.</p>';
+        openModal('followListModal');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Edit Profile ----
+function openEditProfile(){
+    document.getElementById('editName').value = currentUser.name || '';
+    api(`/api/users/${currentUser.id}`).then(data => {
+        document.getElementById('editBio').value = data.user.bio || '';
+        document.getElementById('editPrivate').checked = !!data.user.is_private;
+    });
+    openModal('editProfileModal');
+}
+
+async function saveProfileEdits(){
+    const name = document.getElementById('editName').value.trim();
+    const bio = document.getElementById('editBio').value.trim();
+    const isPrivate = document.getElementById('editPrivate').checked;
+    const avatarFile = document.getElementById('editAvatarFile').files[0];
+    const coverFile = document.getElementById('editCoverFile').files[0];
+    try {
+        await api('/api/users/me', { method: 'PUT', body: JSON.stringify({ name, bio }) });
+        await api('/api/users/me/privacy', { method: 'PUT', body: JSON.stringify({ is_private: isPrivate }) });
+        if (avatarFile) {
+            const form = new FormData(); form.append('photo', avatarFile);
+            await apiForm('/api/users/me/photo?type=avatar', form);
+        }
+        if (coverFile) {
+            const form = new FormData(); form.append('photo', coverFile);
+            await apiForm('/api/users/me/photo?type=cover', form);
+        }
+        currentUser.name = name;
+        closeModal('editProfileModal');
+        showToast('Profile updated!');
+        viewProfile(currentUser.id);
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Search ----
+async function runSearch(){
+    const q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+    switchPage('search');
+    try {
+        const data = await api('/api/search?q=' + encodeURIComponent(q));
+        searchTabData = data;
+        switchSearchTab(activeSearchTab);
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+function switchSearchTab(tab){
+    activeSearchTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    const container = document.getElementById('searchResults');
+    if (tab === 'users') {
+        container.innerHTML = (searchTabData.users || []).map(u => `
+            <div class="bg-white rounded-xl shadow p-4 flex items-center gap-3 cursor-pointer" onclick="viewProfile(${u.id})">
+                <div class="avatar w-10 h-10">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                <span class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary text-xs"></i>' : ''}</span>
+            </div>
+        `).join('') || '<p class="text-gray-400 text-center py-6">No people found.</p>';
+    } else if (tab === 'posts') {
+        container.innerHTML = (searchTabData.posts || []).map(p => `
+            <div class="bg-white rounded-xl shadow p-4 cursor-pointer" onclick="viewProfile(${p.author_id})">
+                <p class="text-sm font-semibold mb-1">${escapeHtml(p.author_name)}</p>
+                <p class="text-gray-700 text-sm">${linkify(p.text || '')}</p>
+            </div>
+        `).join('') || '<p class="text-gray-400 text-center py-6">No posts found.</p>';
+    } else {
+        container.innerHTML = (searchTabData.hashtags || []).map(h => `
+            <div class="bg-white rounded-xl shadow p-4 cursor-pointer flex justify-between" onclick="viewHashtag('${h.tag}')">
+                <span class="font-medium text-primary">#${escapeHtml(h.tag)}</span>
+                <span class="text-gray-400 text-sm">${h.post_count} posts</span>
+            </div>
+        `).join('') || '<p class="text-gray-400 text-center py-6">No hashtags found.</p>';
+    }
+}
+
+async function viewHashtag(tag){
+    switchPage('search');
+    try {
+        const data = await api('/api/search/hashtag/' + encodeURIComponent(tag));
+        searchTabData.posts = data.posts;
+        activeSearchTab = 'posts';
+        switchSearchTab('posts');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Notifications ----
+async function pollNotifications(){
+    if (!currentUser) return;
+    try {
+        const data = await api('/api/notifications/unread-count');
+        const badge = document.getElementById('notifBadge');
+        if (data.count > 0) { badge.textContent = data.count > 9 ? '9+' : data.count; badge.classList.remove('hidden'); }
+        else badge.classList.add('hidden');
+    } catch {}
+}
+
+function notifText(n){
+    const name = escapeHtml(n.actor_name);
+    if (n.type === 'like') return `${name} liked your post`;
+    if (n.type === 'comment') return `${name} commented on your post`;
+    if (n.type === 'follow') return `${name} started following you`;
+    if (n.type === 'follow_request') return `${name} requested to follow you`;
+    return `${name} interacted with you`;
+}
+
+async function openNotifications(){
+    if (!currentUser) return openModal('authModal');
+    switchPage('notifications');
+    try {
+        const data = await api('/api/notifications');
+        document.getElementById('notificationsList').innerHTML = data.notifications.map(n => `
+            <div class="p-4 flex items-center gap-3 ${n.is_read ? '' : 'bg-indigo-50'} cursor-pointer" onclick="viewProfile(${n.actor_id})">
+                <div class="avatar w-9 h-9 text-sm">${escapeHtml(n.actor_name).charAt(0).toUpperCase()}</div>
+                <div class="flex-1">
+                    <p class="text-sm">${notifText(n)}</p>
+                    <p class="text-xs text-gray-400">${new Date(n.created_at).toLocaleString()}</p>
+                </div>
+            </div>
+        `).join('') || '<p class="text-center text-gray-400 py-10">No notifications yet.</p>';
+        await api('/api/notifications/mark-read', { method: 'POST' });
+        pollNotifications();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Chat (DMs) ----
+function toggleChat(){
+    const container = document.getElementById('chatContainer');
+    const willOpen = !container.classList.contains('active');
+    container.classList.toggle('active');
+    if (willOpen) showChatContactList();
+}
+
+function showChatContactList(){
+    document.getElementById('chatConversation').style.display = 'none';
+    document.getElementById('chatContactList').style.display = 'block';
+    document.getElementById('chatBackBtn').classList.add('hidden');
+    document.getElementById('chatHeaderTitle').textContent = 'Messages';
+    loadChatContacts();
+}
+
+async function loadChatContacts(){
+    if (!currentUser) {
+        document.getElementById('chatContactList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Sign in to message people.</p>';
+        return;
+    }
+    try {
+        const following = await api(`/api/users/${currentUser.id}/following`);
+        const list = following.following || [];
+        document.getElementById('chatContactList').innerHTML = list.map(u => `
+            <div class="contact-row" onclick="openConversation(${u.id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
+                <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
+            </div>
+        `).join('') || '<p class="text-center text-gray-400 p-6 text-sm">Follow people to start messaging them.</p>';
+    } catch { document.getElementById('chatContactList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Could not load contacts.</p>'; }
+}
+
+function openConversation(userId, name){
+    if (!currentUser) return openModal('authModal');
+    currentChatContact = userId;
+    document.getElementById('chatContactList').style.display = 'none';
+    document.getElementById('chatConversation').style.display = 'flex';
+    document.getElementById('chatBackBtn').classList.remove('hidden');
+    document.getElementById('chatHeaderTitle').textContent = name;
+    document.getElementById('chatMessages').innerHTML = '';
+}
 
 function connectChat(){
     socket = io({ auth: { token } });
     socket.on('direct_message', (msg) => {
-        const kind = msg.sender_id === currentUser.id ? 'sent' : 'received';
-        appendChatMessage(msg.text, kind);
+        const relevant = (msg.sender_id === currentChatContact) || (msg.sender_id === currentUser.id && msg.recipient_id === currentChatContact);
+        if (relevant) {
+            const kind = msg.sender_id === currentUser.id ? 'sent' : 'received';
+            appendChatMessage(msg.text, kind);
+        }
     });
 }
 
@@ -278,12 +675,11 @@ function appendChatMessage(text, kind){
 }
 
 function sendChatMessage(){
-    if (!currentUser) return openModal('authModal');
+    if (!currentChatContact) return;
     const input = document.getElementById('chatInputField');
     const text = input.value.trim();
     if (!text) return;
-    // Demo recipient: user ID 1. In a real UI you'd pick a contact first.
-    socket.emit('direct_message', { recipientId: 1, text });
+    socket.emit('direct_message', { recipientId: currentChatContact, text });
     input.value = '';
 }
 
