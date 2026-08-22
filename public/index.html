@@ -26,17 +26,21 @@
     .tab-btn { padding: 8px 4px; border-bottom: 2px solid transparent; color: #6b7280; font-weight: 500; cursor: pointer; }
     .tab-btn.active { border-color: #4F46E5; color: #4F46E5; }
     .badge-dot { position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
-    .chat-container { position: fixed; bottom: 76px; right: 20px; width: 340px; max-width: calc(100vw - 32px); height: 480px; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; z-index: 1000; transform: translateY(20px); opacity: 0; visibility: hidden; transition: all .3s ease; }
-    .chat-container.active { transform: translateY(0); opacity: 1; visibility: visible; }
-    .chat-header { padding: 12px 16px; background: linear-gradient(135deg,#4F46E5,#818CF8); color: white; border-radius: 16px 16px 0 0; display:flex; justify-content:space-between; align-items:center; }
-    .chat-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
     .contact-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
     .contact-row:hover { background: #f9fafb; }
-    .chat-messages { flex:1; padding:14px; overflow-y:auto; background:#f9fafb; }
+    .chat-messages { flex:1; padding:14px; overflow-y:auto; background:#f9fafb; min-height: 50vh; }
     .message { margin-bottom:10px; max-width:80%; }
     .received { background:#e5e7eb; border-radius:18px 18px 18px 4px; padding:8px 12px; }
     .sent { background:#4F46E5; color:white; border-radius:18px 18px 4px 18px; padding:8px 12px; margin-left:auto; }
-    .chat-toggle { position: fixed; bottom: 20px; right: 20px; width: 58px; height: 58px; background:#4F46E5; color:white; border:none; border-radius:50%; cursor:pointer; z-index:999; font-size:20px; }
+    .stories-bar { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; }
+    .story-circle { flex-shrink: 0; width: 66px; text-align: center; cursor: pointer; }
+    .story-ring { width: 60px; height: 60px; border-radius: 50%; padding: 2px; background: linear-gradient(45deg,#f59e0b,#EC4899,#4F46E5); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+    .story-ring.own { background: #d1d5db; }
+    .story-ring-inner { width: 100%; height: 100%; border-radius: 50%; background: white; padding: 2px; display: flex; align-items: center; justify-content: center; }
+    .story-viewer-overlay { position: fixed; inset: 0; background: black; z-index: 3000; display: none; flex-direction: column; }
+    .story-viewer-overlay.show { display: flex; }
+    .story-progress-bar { height: 3px; background: rgba(255,255,255,.3); border-radius: 2px; flex: 1; overflow: hidden; }
+    .story-progress-fill { height: 100%; background: white; width: 0%; }
     ::placeholder { color: #9ca3af; }
 </style>
 </head>
@@ -61,6 +65,7 @@
 
     <!-- FEED -->
     <section id="feedPage" class="page active">
+        <div class="stories-bar" id="storiesBar"></div>
         <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
             <textarea id="newPostText" placeholder="What's on your mind? Use #hashtags" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
             <div class="flex items-center justify-between mt-2">
@@ -189,18 +194,15 @@
     </div>
 </div>
 
-<!-- Chat Widget -->
-<div class="chat-container" id="chatContainer">
-    <div class="chat-header">
-        <h4 class="font-bold" id="chatHeaderTitle">Messages</h4>
-        <div class="flex items-center gap-2">
+<!-- MESSAGES PAGE -->
+<section id="messagesPage" class="page">
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden" style="min-height: 70vh; display: flex; flex-direction: column;">
+        <div class="p-4 border-b flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white">
             <button id="chatBackBtn" onclick="showChatContactList()" class="hidden text-white"><i class="fas fa-arrow-left"></i></button>
-            <button onclick="toggleChat()" class="text-white text-xl leading-none">&times;</button>
+            <h3 class="font-bold" id="chatHeaderTitle">Messages</h3>
         </div>
-    </div>
-    <div class="chat-body">
         <div id="chatContactList" class="overflow-y-auto"></div>
-        <div id="chatConversation" class="hidden flex-1 flex-col" style="display:none;">
+        <div id="chatConversation" class="flex-1 flex-col" style="display:none;">
             <div class="chat-messages" id="chatMessages"></div>
             <div class="flex p-3 border-t">
                 <input id="chatInputField" type="text" placeholder="Type a message..." class="flex-1 border border-gray-300 rounded-full px-4 py-2" onkeydown="if(event.key==='Enter') sendChatMessage()">
@@ -208,15 +210,32 @@
             </div>
         </div>
     </div>
+</section>
+
+<!-- Story Viewer -->
+<div class="story-viewer-overlay" id="storyViewerOverlay">
+    <div class="flex gap-1 p-3">
+        <div class="story-progress-bar" id="storyProgressBar"><div class="story-progress-fill" id="storyProgressFill"></div></div>
+    </div>
+    <div class="flex items-center justify-between px-3 text-white mb-2">
+        <div class="flex items-center gap-2">
+            <div class="avatar w-8 h-8 text-xs" id="storyViewerAvatar"></div>
+            <span class="font-medium text-sm" id="storyViewerName"></span>
+        </div>
+        <button onclick="closeStoryViewer()" class="text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="flex-1 flex items-center justify-center relative" onclick="handleStoryTap(event)">
+        <div id="storyMediaWrap" class="w-full h-full flex items-center justify-center"></div>
+    </div>
 </div>
-<button class="chat-toggle hidden" id="legacyChatToggle" onclick="toggleChat()"><i class="fas fa-comment-dots"></i></button>
+<input type="file" id="storyFileInput" accept="image/*,video/*" class="hidden" onchange="uploadStory()">
 
 <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 flex justify-around items-center py-2">
     <button onclick="showFeed()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-home"></i></button>
     <button onclick="switchPage('search')" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-search"></i></button>
     <button onclick="showReels()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-film"></i></button>
     <button onclick="focusComposer()" class="flex flex-col items-center bg-primary text-white w-11 h-11 rounded-full text-xl -mt-1"><i class="fas fa-plus"></i></button>
-    <button onclick="toggleChat()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-comment-dots"></i></button>
+    <button onclick="showMessages()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-comment-dots"></i></button>
     <button onclick="openNotifications()" class="relative flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2">
         <i class="far fa-bell"></i>
         <span id="notifBadge" class="badge-dot hidden">0</span>
@@ -409,6 +428,7 @@ async function loadFeed(){
     try {
         const data = await api('/api/posts');
         renderPostList(data.posts, 'postsContainer');
+        loadStories();
     } catch { showToast('Could not load feed', 'error'); }
 }
 
@@ -750,11 +770,135 @@ async function openNotifications(){
 }
 
 // ---- Chat (DMs) ----
-function toggleChat(){
-    const container = document.getElementById('chatContainer');
-    const willOpen = !container.classList.contains('active');
-    container.classList.toggle('active');
-    if (willOpen) showChatContactList();
+function showMessages(){
+    if (!currentUser) return openModal('authModal');
+    switchPage('messages');
+    showChatContactList();
+}
+
+// ---- Stories ----
+let storiesGrouped = [];
+let storyViewerState = { authorIndex: 0, storyIndex: 0, timer: null };
+
+async function loadStories(){
+    try {
+        const data = await api('/api/stories');
+        const groups = {};
+        for (const s of data.stories) {
+            if (!groups[s.author_id]) groups[s.author_id] = { author_id: s.author_id, author_name: s.author_name, author_avatar: s.author_avatar, stories: [] };
+            groups[s.author_id].stories.push(s);
+        }
+        storiesGrouped = Object.values(groups);
+        renderStoriesBar();
+    } catch { /* stories are non-critical, fail silently */ }
+}
+
+function renderStoriesBar(){
+    const bar = document.getElementById('storiesBar');
+    let html = '';
+    if (currentUser) {
+        const mine = storiesGrouped.find(g => g.author_id === currentUser.id);
+        html += `
+            <div class="story-circle" onclick="${mine ? `openStoryViewer(${storiesGrouped.indexOf(mine)})` : "document.getElementById('storyFileInput').click()"}">
+                <div class="story-ring ${mine ? '' : 'own'}">
+                    <div class="story-ring-inner">
+                        <div class="avatar w-full h-full text-sm">${currentUser.name.charAt(0).toUpperCase()}</div>
+                    </div>
+                </div>
+                <p class="text-xs mt-1 truncate">${mine ? 'Your Story' : 'Add Story'}</p>
+            </div>`;
+    }
+    storiesGrouped.forEach((g, idx) => {
+        if (currentUser && g.author_id === currentUser.id) return; // already shown above
+        html += `
+            <div class="story-circle" onclick="openStoryViewer(${idx})">
+                <div class="story-ring">
+                    <div class="story-ring-inner">
+                        <div class="avatar w-full h-full text-sm">${escapeHtml(g.author_name).charAt(0).toUpperCase()}</div>
+                    </div>
+                </div>
+                <p class="text-xs mt-1 truncate">${escapeHtml(g.author_name)}</p>
+            </div>`;
+    });
+    bar.innerHTML = html;
+}
+
+async function uploadStory(){
+    const file = document.getElementById('storyFileInput').files[0];
+    if (!file || !currentUser) return;
+    try {
+        const form = new FormData();
+        form.append('media', file);
+        await apiForm('/api/stories', form);
+        showToast('Story posted! It disappears in 24 hours.');
+        document.getElementById('storyFileInput').value = '';
+        loadStories();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+function openStoryViewer(authorIndex){
+    storyViewerState.authorIndex = authorIndex;
+    storyViewerState.storyIndex = 0;
+    document.getElementById('storyViewerOverlay').classList.add('show');
+    renderCurrentStory();
+}
+
+function closeStoryViewer(){
+    clearTimeout(storyViewerState.timer);
+    document.getElementById('storyViewerOverlay').classList.remove('show');
+    document.getElementById('storyMediaWrap').innerHTML = '';
+}
+
+function renderCurrentStory(){
+    clearTimeout(storyViewerState.timer);
+    const group = storiesGrouped[storyViewerState.authorIndex];
+    if (!group) return closeStoryViewer();
+    const story = group.stories[storyViewerState.storyIndex];
+    if (!story) return closeStoryViewer();
+
+    document.getElementById('storyViewerAvatar').textContent = group.author_name.charAt(0).toUpperCase();
+    document.getElementById('storyViewerName').textContent = group.author_name;
+
+    const wrap = document.getElementById('storyMediaWrap');
+    if (story.media_type === 'video') {
+        wrap.innerHTML = `<video src="${story.media_url}" class="max-h-full max-w-full" autoplay playsinline onended="advanceStory()"></video>`;
+    } else {
+        wrap.innerHTML = `<img src="${story.media_url}" class="max-h-full max-w-full object-contain">`;
+        const fill = document.getElementById('storyProgressFill');
+        fill.style.transition = 'none'; fill.style.width = '0%';
+        requestAnimationFrame(() => { fill.style.transition = 'width 5s linear'; fill.style.width = '100%'; });
+        storyViewerState.timer = setTimeout(advanceStory, 5000);
+    }
+}
+
+function advanceStory(){
+    const group = storiesGrouped[storyViewerState.authorIndex];
+    if (storyViewerState.storyIndex < group.stories.length - 1) {
+        storyViewerState.storyIndex++;
+    } else if (storyViewerState.authorIndex < storiesGrouped.length - 1) {
+        storyViewerState.authorIndex++;
+        storyViewerState.storyIndex = 0;
+    } else {
+        return closeStoryViewer();
+    }
+    renderCurrentStory();
+}
+
+function goBackStory(){
+    if (storyViewerState.storyIndex > 0) {
+        storyViewerState.storyIndex--;
+    } else if (storyViewerState.authorIndex > 0) {
+        storyViewerState.authorIndex--;
+        storyViewerState.storyIndex = storiesGrouped[storyViewerState.authorIndex].stories.length - 1;
+    } else {
+        return;
+    }
+    renderCurrentStory();
+}
+
+function handleStoryTap(event){
+    const isRightSide = event.clientX > window.innerWidth / 2;
+    if (isRightSide) advanceStory(); else goBackStory();
 }
 
 function showChatContactList(){

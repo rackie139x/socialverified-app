@@ -120,3 +120,12 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS iv TEXT;
 
 -- Reels: short vertical videos, shown in their own feed separate from regular posts
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_reel BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS stories (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    media_url TEXT NOT NULL,
+    media_type TEXT NOT NULL, -- 'image' or 'video'
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours')
+);
