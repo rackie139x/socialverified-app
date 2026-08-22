@@ -12,7 +12,7 @@
 </script>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
+    body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding-bottom: 64px; }
     .page { display: none; } .page.active { display: block; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; }
     .modal-overlay.show { display: flex; }
@@ -26,7 +26,7 @@
     .tab-btn { padding: 8px 4px; border-bottom: 2px solid transparent; color: #6b7280; font-weight: 500; cursor: pointer; }
     .tab-btn.active { border-color: #4F46E5; color: #4F46E5; }
     .badge-dot { position: absolute; top: -2px; right: -2px; background: #ef4444; color: white; font-size: 10px; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
-    .chat-container { position: fixed; bottom: 96px; right: 20px; width: 340px; max-width: calc(100vw - 32px); height: 480px; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; z-index: 1000; transform: translateY(20px); opacity: 0; visibility: hidden; transition: all .3s ease; }
+    .chat-container { position: fixed; bottom: 76px; right: 20px; width: 340px; max-width: calc(100vw - 32px); height: 480px; background: white; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; z-index: 1000; transform: translateY(20px); opacity: 0; visibility: hidden; transition: all .3s ease; }
     .chat-container.active { transform: translateY(0); opacity: 1; visibility: visible; }
     .chat-header { padding: 12px 16px; background: linear-gradient(135deg,#4F46E5,#818CF8); color: white; border-radius: 16px 16px 0 0; display:flex; justify-content:space-between; align-items:center; }
     .chat-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
@@ -50,16 +50,7 @@
             </div>
             <h1 class="text-xl font-bold text-dark hidden sm:block">Social<span class="text-primary">Verified</span></h1>
         </div>
-
-        <div class="flex-1 relative">
-            <input id="searchInput" type="text" placeholder="Search people, posts, #hashtags" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') runSearch()">
-        </div>
-
-        <button onclick="openNotifications()" class="relative text-gray-600 hover:text-primary text-xl flex-shrink-0">
-            <i class="far fa-bell"></i>
-            <span id="notifBadge" class="badge-dot hidden">0</span>
-        </button>
-
+        <div class="flex-1"></div>
         <div id="authArea" class="flex items-center flex-shrink-0">
             <button onclick="openModal('authModal')" id="signInBtn" class="bg-primary text-white px-4 py-2 rounded-full font-medium hover:bg-indigo-700 text-sm whitespace-nowrap">Sign In</button>
         </div>
@@ -105,6 +96,9 @@
 
     <!-- SEARCH RESULTS -->
     <section id="searchPage" class="page">
+        <div class="bg-white rounded-xl shadow p-3 mb-4">
+            <input id="searchInput" type="text" placeholder="Search people, posts, #hashtags" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') runSearch()">
+        </div>
         <div class="flex gap-4 border-b mb-4 bg-white rounded-t-xl px-4 pt-3">
             <div class="tab-btn active" data-tab="users" onclick="switchSearchTab('users')">People</div>
             <div class="tab-btn" data-tab="posts" onclick="switchSearchTab('posts')">Posts</div>
@@ -207,7 +201,19 @@
         </div>
     </div>
 </div>
-<button class="chat-toggle" onclick="toggleChat()"><i class="fas fa-comment-dots"></i></button>
+<button class="chat-toggle hidden" id="legacyChatToggle" onclick="toggleChat()"><i class="fas fa-comment-dots"></i></button>
+
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 flex justify-around items-center py-2">
+    <button onclick="showFeed()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-home"></i></button>
+    <button onclick="switchPage('search')" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-search"></i></button>
+    <button onclick="focusComposer()" class="flex flex-col items-center bg-primary text-white w-11 h-11 rounded-full text-xl -mt-1"><i class="fas fa-plus"></i></button>
+    <button onclick="toggleChat()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-comment-dots"></i></button>
+    <button onclick="openNotifications()" class="relative flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2">
+        <i class="far fa-bell"></i>
+        <span id="notifBadge" class="badge-dot hidden">0</span>
+    </button>
+    <button onclick="currentUser ? viewProfile(currentUser.id) : openModal('authModal')" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="far fa-user"></i></button>
+</nav>
 <div id="toastRoot"></div>
 
 <script>
@@ -219,6 +225,80 @@ let currentChatContact = null;
 let currentProfileId = null;
 let searchTabData = { users: [], posts: [], hashtags: [] };
 let activeSearchTab = 'users';
+
+// ==== End-to-end encryption (Web Crypto API: ECDH P-256 + AES-GCM) ====
+// How it works: each device generates its own ECDH key pair. The PUBLIC key
+// is uploaded to the server so other people can find it. The PRIVATE key
+// never leaves this browser - it's kept in localStorage on this device only.
+// To message someone, we combine OUR private key with THEIR public key via
+// ECDH, which produces the exact same shared secret they get by combining
+// THEIR private key with OUR public key. That shared secret becomes an
+// AES-GCM key used to encrypt/decrypt - the server only ever sees ciphertext.
+const sharedKeyCache = {}; // userId -> CryptoKey, cached per session to avoid re-deriving every message
+
+async function getOrCreateMyKeyPair(){
+    const storedPrivate = localStorage.getItem('sv_privkey_jwk');
+    const storedPublic = localStorage.getItem('sv_pubkey_jwk');
+    if (storedPrivate && storedPublic) {
+        const privateKey = await crypto.subtle.importKey('jwk', JSON.parse(storedPrivate), { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+        return { privateKey, publicJwk: JSON.parse(storedPublic) };
+    }
+    const keyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+    const privateJwk = await crypto.subtle.exportKey('jwk', keyPair.privateKey);
+    const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+    localStorage.setItem('sv_privkey_jwk', JSON.stringify(privateJwk));
+    localStorage.setItem('sv_pubkey_jwk', JSON.stringify(publicJwk));
+    return { privateKey: keyPair.privateKey, publicJwk };
+}
+
+async function publishMyPublicKey(){
+    const { publicJwk } = await getOrCreateMyKeyPair();
+    await api('/api/users/me/public-key', { method: 'PUT', body: JSON.stringify({ public_key: JSON.stringify(publicJwk) }) });
+}
+
+async function getSharedKeyWith(otherUserId){
+    if (sharedKeyCache[otherUserId]) return sharedKeyCache[otherUserId];
+    const { privateKey } = await getOrCreateMyKeyPair();
+    const data = await api(`/api/users/${otherUserId}/public-key`);
+    if (!data.public_key) throw new Error("This person hasn't set up secure messaging yet");
+    const theirPublicKey = await crypto.subtle.importKey('jwk', JSON.parse(data.public_key), { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+    const sharedKey = await crypto.subtle.deriveKey(
+        { name: 'ECDH', public: theirPublicKey },
+        privateKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+    sharedKeyCache[otherUserId] = sharedKey;
+    return sharedKey;
+}
+
+function bufToBase64(buf){ return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function base64ToBuf(b64){ return Uint8Array.from(atob(b64), c => c.charCodeAt(0)); }
+
+async function encryptForContact(otherUserId, plaintext){
+    const key = await getSharedKeyWith(otherUserId);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plaintext);
+    const ciphertextBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+    return { ciphertext: bufToBase64(ciphertextBuf), iv: bufToBase64(iv) };
+}
+
+async function decryptFromContact(otherUserId, ciphertextB64, ivB64){
+    try {
+        const key = await getSharedKeyWith(otherUserId);
+        const plaintextBuf = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: base64ToBuf(ivB64) },
+            key,
+            base64ToBuf(ciphertextB64)
+        );
+        return new TextDecoder().decode(plaintextBuf);
+    } catch (err) {
+        return '[Could not decrypt this message]';
+    }
+}
+// ==== end E2EE engine ====
+
 
 function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
@@ -240,6 +320,11 @@ function switchPage(name){
     document.getElementById(name+'Page').classList.add('active');
 }
 function showFeed(){ switchPage('feed'); loadFeed(); }
+function focusComposer(){
+    if (!currentUser) return openModal('authModal');
+    showFeed();
+    setTimeout(() => document.getElementById('newPostText').focus(), 100);
+}
 
 async function api(path, options={}) {
     const headers = { 'Content-Type': 'application/json', ...(options.headers||{}) };
@@ -291,6 +376,7 @@ function onAuthed(){
         </div>`;
     document.getElementById('composer').classList.remove('hidden');
     document.getElementById('signedOutNotice').classList.add('hidden');
+    publishMyPublicKey().catch(() => showToast('Could not set up secure messaging', 'error'));
     connectChat();
     loadFeed();
     pollNotifications();
@@ -644,23 +730,37 @@ async function loadChatContacts(){
     } catch { document.getElementById('chatContactList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Could not load contacts.</p>'; }
 }
 
-function openConversation(userId, name){
+async function openConversation(userId, name){
     if (!currentUser) return openModal('authModal');
     currentChatContact = userId;
     document.getElementById('chatContactList').style.display = 'none';
     document.getElementById('chatConversation').style.display = 'flex';
     document.getElementById('chatBackBtn').classList.remove('hidden');
-    document.getElementById('chatHeaderTitle').textContent = name;
-    document.getElementById('chatMessages').innerHTML = '';
+    document.getElementById('chatHeaderTitle').innerHTML = `${escapeHtml(name)} <i class="fas fa-lock text-xs ml-1" title="End-to-end encrypted"></i>`;
+    const wrap = document.getElementById('chatMessages');
+    wrap.innerHTML = '<p class="text-center text-gray-400 text-sm py-4">Decrypting messages...</p>';
+    try {
+        const data = await api(`/api/messages/with/${userId}`);
+        wrap.innerHTML = '';
+        for (const msg of data.messages) {
+            const otherParty = msg.sender_id === currentUser.id ? msg.recipient_id : msg.sender_id;
+            const plaintext = await decryptFromContact(otherParty, msg.ciphertext, msg.iv);
+            appendChatMessage(plaintext, msg.sender_id === currentUser.id ? 'sent' : 'received');
+        }
+    } catch (err) {
+        wrap.innerHTML = `<p class="text-center text-gray-400 text-sm py-4">${escapeHtml(err.message)}</p>`;
+    }
 }
 
 function connectChat(){
     socket = io({ auth: { token } });
-    socket.on('direct_message', (msg) => {
+    socket.on('direct_message', async (msg) => {
         const relevant = (msg.sender_id === currentChatContact) || (msg.sender_id === currentUser.id && msg.recipient_id === currentChatContact);
         if (relevant) {
+            const otherParty = msg.sender_id === currentUser.id ? msg.recipient_id : msg.sender_id;
+            const plaintext = await decryptFromContact(otherParty, msg.ciphertext, msg.iv);
             const kind = msg.sender_id === currentUser.id ? 'sent' : 'received';
-            appendChatMessage(msg.text, kind);
+            appendChatMessage(plaintext, kind);
         }
     });
 }
@@ -674,13 +774,18 @@ function appendChatMessage(text, kind){
     wrap.scrollTop = wrap.scrollHeight;
 }
 
-function sendChatMessage(){
+async function sendChatMessage(){
     if (!currentChatContact) return;
     const input = document.getElementById('chatInputField');
     const text = input.value.trim();
     if (!text) return;
-    socket.emit('direct_message', { recipientId: currentChatContact, text });
-    input.value = '';
+    try {
+        const { ciphertext, iv } = await encryptForContact(currentChatContact, text);
+        socket.emit('direct_message', { recipientId: currentChatContact, ciphertext, iv });
+        input.value = '';
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
 tryRestoreSession();

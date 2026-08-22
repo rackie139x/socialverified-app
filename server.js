@@ -12,6 +12,7 @@ const postRoutes = require('./routes/posts');
 const userRoutes = require('./routes/users');
 const notificationRoutes = require('./routes/notifications');
 const searchRoutes = require('./routes/search');
+const messageRoutes = require('./routes/messages');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,6 +26,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/messages', messageRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -48,14 +50,14 @@ const onlineUsers = new Map(); // userId -> socket.id
 io.on('connection', (socket) => {
     onlineUsers.set(socket.userId, socket.id);
 
-    socket.on('direct_message', async ({ recipientId, text }) => {
-        if (!text || !text.trim()) return;
+    socket.on('direct_message', async ({ recipientId, ciphertext, iv }) => {
+        if (!ciphertext || !iv) return;
         try {
             const result = await pool.query(
-                'INSERT INTO messages (sender_id, recipient_id, text) VALUES ($1, $2, $3) RETURNING id, text, created_at',
-                [socket.userId, recipientId, text.trim()]
+                'INSERT INTO messages (sender_id, recipient_id, text, iv) VALUES ($1, $2, $3, $4) RETURNING id, text AS ciphertext, iv, created_at',
+                [socket.userId, recipientId, ciphertext, iv]
             );
-            const message = { ...result.rows[0], sender_id: socket.userId, recipient_id: recipientId };
+            const message = { ...result.rows[0], sender_id: socket.userId, recipient_id: Number(recipientId) };
             const recipientSocket = onlineUsers.get(Number(recipientId));
             if (recipientSocket) io.to(recipientSocket).emit('direct_message', message);
             socket.emit('direct_message', message); // echo back to sender

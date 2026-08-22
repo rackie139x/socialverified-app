@@ -84,6 +84,23 @@ router.put('/me/privacy', requireAuth, async (req, res) => {
     res.json({ is_private: !!is_private });
 });
 
+// ---- End-to-end encryption key exchange ----
+// The server stores each user's PUBLIC key only. Private keys never leave
+// the browser they were generated on, so the server can relay messages
+// without ever being able to read them.
+router.put('/me/public-key', requireAuth, async (req, res) => {
+    const { public_key } = req.body;
+    if (!public_key) return res.status(400).json({ error: 'public_key is required' });
+    await pool.query('UPDATE users SET public_key = $1 WHERE id = $2', [public_key, req.userId]);
+    res.json({ ok: true });
+});
+
+router.get('/:id/public-key', async (req, res) => {
+    const result = await pool.query('SELECT public_key FROM users WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json({ public_key: result.rows[0].public_key });
+});
+
 // ---- Follow / Follow requests ----
 router.post('/:id/follow', requireAuth, async (req, res) => {
     const targetId = Number(req.params.id);

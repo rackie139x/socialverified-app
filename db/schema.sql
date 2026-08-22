@@ -111,3 +111,9 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_url TEXT;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS repost_of INTEGER REFERENCES posts(id) ON DELETE SET NULL;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS quote_text TEXT;
+
+-- End-to-end encryption support: server only ever stores ciphertext + the IV
+-- needed to decrypt it. It never sees a public/private key pairing that
+-- would let it decrypt messages itself - only the two participants can.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS public_key TEXT;
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS iv TEXT;
