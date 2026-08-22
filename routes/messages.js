@@ -10,9 +10,12 @@ const router = express.Router();
 router.get('/conversations', requireAuth, async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT DISTINCT ON (other_user_id) other_user_id, u.name, u.avatar_url, u.is_verified, m.created_at AS last_message_at
+            SELECT DISTINCT ON (other_user_id) other_user_id, u.name, u.avatar_url, u.is_verified,
+                   m.created_at AS last_message_at, m.sender_id AS last_sender_id,
+                   m.ciphertext AS last_ciphertext, m.iv AS last_iv, m.is_read AS last_is_read
             FROM (
-                SELECT CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END AS other_user_id, created_at
+                SELECT CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END AS other_user_id,
+                       sender_id, text AS ciphertext, iv, is_read, created_at
                 FROM messages WHERE sender_id = $1 OR recipient_id = $1
             ) m
             JOIN users u ON u.id = m.other_user_id

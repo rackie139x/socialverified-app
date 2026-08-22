@@ -14,6 +14,7 @@ const notificationRoutes = require('./routes/notifications');
 const searchRoutes = require('./routes/search');
 const messageRoutes = require('./routes/messages');
 const storyRoutes = require('./routes/stories');
+const noteRoutes = require('./routes/notes');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,6 +30,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/stories', storyRoutes);
+app.use('/api/notes', noteRoutes);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -49,8 +51,14 @@ io.use((socket, next) => {
 
 const onlineUsers = new Map(); // userId -> socket.id
 
+function broadcastPresence(){
+    io.emit('presence_update', { online: [...onlineUsers.keys()] });
+}
+
 io.on('connection', (socket) => {
     onlineUsers.set(socket.userId, socket.id);
+    broadcastPresence();
+    socket.emit('presence_update', { online: [...onlineUsers.keys()] }); // give the new connection the current list right away
 
     socket.on('direct_message', async ({ recipientId, ciphertext, iv }) => {
         if (!ciphertext || !iv) return;
@@ -68,8 +76,25 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Called when someone opens a conversation - marks the other person's
+    // messages to them as read, and tells that person live (if online) so
+    // their sent-message checkmarks can update from single to double tick.
+    socket.on('mark_read', async ({ contactId }) => {
+        try {
+            await pool.query(
+                'UPDATE messages SET is_read = TRUE WHERE sender_id = $1 AND recipient_id = $2 AND is_read = FALSE',
+                [contactId, socket.userId]
+            );
+            const contactSocket = onlineUsers.get(Number(contactId));
+            if (contactSocket) io.to(contactSocket).emit('read_receipt', { byUserId: socket.userId });
+        } catch (err) {
+            console.error(err);
+        }
+    });
+
     socket.on('disconnect', () => {
         onlineUsers.delete(socket.userId);
+        broadcastPresence();
     });
 });
 

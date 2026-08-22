@@ -196,12 +196,14 @@
 
 <!-- MESSAGES PAGE -->
 <section id="messagesPage" class="page">
-    <div class="bg-white rounded-2xl shadow-lg overflow-hidden" style="min-height: 70vh; display: flex; flex-direction: column;">
-        <div class="p-4 border-b flex items-center gap-2 bg-gradient-to-r from-primary to-secondary text-white">
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden relative" style="min-height: 70vh; display: flex; flex-direction: column;">
+        <div class="p-4 border-b flex items-center gap-3 bg-gradient-to-r from-primary to-secondary text-white">
             <button id="chatBackBtn" onclick="showChatContactList()" class="hidden text-white"><i class="fas fa-arrow-left"></i></button>
-            <h3 class="font-bold" id="chatHeaderTitle">Messages</h3>
+            <h3 class="font-bold flex-1" id="chatHeaderTitle">Messages</h3>
+            <button id="chatSettingsBtn" onclick="openModal('messageSettingsModal')" class="text-white"><i class="fas fa-gear"></i></button>
+            <button id="chatSearchToggleBtn" onclick="document.getElementById('chatSearchInput')?.focus()" class="text-white"><i class="fas fa-magnifying-glass"></i></button>
         </div>
-        <div id="chatContactList" class="overflow-y-auto"></div>
+        <div id="chatContactList" class="overflow-y-auto flex-1"></div>
         <div id="chatConversation" class="flex-1 flex-col" style="display:none;">
             <div class="chat-messages" id="chatMessages"></div>
             <div class="flex p-3 border-t">
@@ -209,8 +211,28 @@
                 <button onclick="sendChatMessage()" class="ml-2 bg-primary text-white w-10 h-10 rounded-full"><i class="fas fa-paper-plane"></i></button>
             </div>
         </div>
+        <button id="newMessageFab" onclick="document.getElementById('chatSearchInput')?.focus()" class="absolute bottom-4 right-4 bg-primary text-white w-12 h-12 rounded-full shadow-lg text-lg"><i class="fas fa-plus"></i></button>
     </div>
 </section>
+
+<!-- Message Settings Modal -->
+<div id="messageSettingsModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Message Settings</h3>
+            <button onclick="closeModal('messageSettingsModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">All your messages are end-to-end encrypted - not even SocialVerified can read them.</p>
+        <label class="flex items-center justify-between py-2 border-b">
+            <span class="text-sm">Show active status / last seen</span>
+            <input type="checkbox" id="showActiveStatusToggle" checked onchange="localStorage.setItem('sv_show_active', this.checked)">
+        </label>
+        <label class="flex items-center justify-between py-2">
+            <span class="text-sm">Send read receipts</span>
+            <input type="checkbox" id="sendReadReceiptsToggle" checked onchange="localStorage.setItem('sv_send_read_receipts', this.checked)">
+        </label>
+    </div>
+</div>
 
 <!-- Story Viewer -->
 <div class="story-viewer-overlay" id="storyViewerOverlay">
@@ -250,6 +272,7 @@ let currentUser = null;
 let authMode = 'login';
 let socket = null;
 let currentChatContact = null;
+let onlineUserIds = new Set();
 let currentProfileId = null;
 let searchTabData = { users: [], posts: [], hashtags: [] };
 let activeSearchTab = 'users';
@@ -916,24 +939,87 @@ async function loadChatContacts(){
         return;
     }
     listEl.innerHTML = `
+        <div class="stories-bar px-3 pt-2" id="notesBar" style="padding-bottom:6px;"></div>
         <div class="p-3 border-b">
             <input id="chatSearchInput" type="text" placeholder="Search anyone to message" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" oninput="searchChatContacts(this.value)">
         </div>
         <div id="chatSearchResults"></div>
         <div id="chatConversationsList"></div>
     `;
+    loadNotesBar();
     try {
         const data = await api('/api/messages/conversations');
         const list = data.conversations || [];
-        document.getElementById('chatConversationsList').innerHTML = list.map(u => `
-            <div class="contact-row" onclick="openConversation(${u.other_user_id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
-                <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
-                <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
-            </div>
-        `).join('') || '<p class="text-center text-gray-400 p-6 text-sm">No conversations yet. Search above to message anyone.</p>';
+        const rows = await Promise.all(list.map(async u => {
+            let preview = '...';
+            try { preview = await decryptFromContact(u.other_user_id, u.last_ciphertext, u.last_iv); } catch {}
+            const isMine = u.last_sender_id === currentUser.id;
+            const prefix = isMine ? 'You: ' : '';
+            const readIcon = isMine ? `<i class="fas fa-check${u.last_is_read ? '-double text-primary' : ''} text-xs text-gray-400 ml-1"></i>` : '';
+            const isOnline = onlineUserIds.has(u.other_user_id);
+            return `
+                <div class="contact-row" onclick="openConversation(${u.other_user_id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
+                    <div class="relative">
+                        <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                        ${isOnline ? '<span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></span>' : ''}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
+                        <p class="text-xs text-gray-400 truncate">${escapeHtml(prefix)}${escapeHtml(preview)}</p>
+                    </div>
+                    ${readIcon}
+                    <span class="text-xs text-gray-300">${timeAgoShort(u.last_message_at)}</span>
+                </div>
+            `;
+        }));
+        document.getElementById('chatConversationsList').innerHTML = rows.join('') || '<p class="text-center text-gray-400 p-6 text-sm">No conversations yet. Search above to message anyone.</p>';
     } catch {
         document.getElementById('chatConversationsList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Could not load conversations.</p>';
     }
+}
+
+function timeAgoShort(dateStr){
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'now';
+    if (mins < 60) return mins + 'm';
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h';
+    return Math.floor(hours / 24) + 'd';
+}
+
+// ---- Notes (short-lived text status above the message list) ----
+async function loadNotesBar(){
+    const bar = document.getElementById('notesBar');
+    if (!bar) return;
+    try {
+        const data = await api('/api/notes');
+        const mine = data.notes.find(n => n.author_id === currentUser.id);
+        let html = `
+            <div class="story-circle" onclick="promptForNote()">
+                <div class="story-ring ${mine ? '' : 'own'}">
+                    <div class="story-ring-inner"><div class="avatar w-full h-full text-sm">${currentUser.name.charAt(0).toUpperCase()}</div></div>
+                </div>
+                <p class="text-xs mt-1 truncate">${mine ? escapeHtml(mine.text) : 'Your note'}</p>
+            </div>`;
+        data.notes.filter(n => n.author_id !== currentUser.id).forEach(n => {
+            html += `
+                <div class="story-circle" onclick="showToast('${escapeHtml(n.author_name).replace(/'/g,"\\'")}: ${escapeHtml(n.text).replace(/'/g,"\\'")}', 'info')">
+                    <div class="story-ring"><div class="story-ring-inner"><div class="avatar w-full h-full text-sm">${escapeHtml(n.author_name).charAt(0).toUpperCase()}</div></div></div>
+                    <p class="text-xs mt-1 truncate">${escapeHtml(n.text)}</p>
+                </div>`;
+        });
+        bar.innerHTML = html;
+    } catch { bar.innerHTML = ''; }
+}
+
+function promptForNote(){
+    const text = prompt('Share a quick note (60 characters max):');
+    if (text === null) return;
+    if (!text.trim()) return;
+    api('/api/notes', { method: 'POST', body: JSON.stringify({ text: text.trim().slice(0, 60) }) })
+        .then(() => { showToast('Note posted!'); loadNotesBar(); })
+        .catch(err => showToast(err.message, 'error'));
 }
 
 let chatSearchTimeout = null;
@@ -960,7 +1046,8 @@ async function openConversation(userId, name){
     document.getElementById('chatContactList').style.display = 'none';
     document.getElementById('chatConversation').style.display = 'flex';
     document.getElementById('chatBackBtn').classList.remove('hidden');
-    document.getElementById('chatHeaderTitle').innerHTML = `${escapeHtml(name)} <i class="fas fa-lock text-xs ml-1" title="End-to-end encrypted"></i>`;
+    const isOnline = onlineUserIds.has(userId);
+    document.getElementById('chatHeaderTitle').innerHTML = `${escapeHtml(name)} <i class="fas fa-lock text-xs ml-1" title="End-to-end encrypted"></i> ${isOnline ? '<span class="text-xs font-normal opacity-90">- Active now</span>' : ''}`;
     const wrap = document.getElementById('chatMessages');
     wrap.innerHTML = '<p class="text-center text-gray-400 text-sm py-4">Decrypting messages...</p>';
     try {
@@ -971,6 +1058,7 @@ async function openConversation(userId, name){
             const plaintext = await decryptFromContact(otherParty, msg.ciphertext, msg.iv);
             appendChatMessage(plaintext, msg.sender_id === currentUser.id ? 'sent' : 'received');
         }
+        if (socket) socket.emit('mark_read', { contactId: userId });
     } catch (err) {
         wrap.innerHTML = `<p class="text-center text-gray-400 text-sm py-4">${escapeHtml(err.message)}</p>`;
     }
@@ -978,6 +1066,14 @@ async function openConversation(userId, name){
 
 function connectChat(){
     socket = io({ auth: { token } });
+    socket.on('presence_update', ({ online }) => {
+        onlineUserIds = new Set(online);
+    });
+    socket.on('read_receipt', ({ byUserId }) => {
+        if (byUserId === currentChatContact) {
+            showToast('Message seen', 'info');
+        }
+    });
     socket.on('direct_message', async (msg) => {
         const relevant = (msg.sender_id === currentChatContact) || (msg.sender_id === currentUser.id && msg.recipient_id === currentChatContact);
         if (relevant) {
@@ -985,6 +1081,7 @@ function connectChat(){
             const plaintext = await decryptFromContact(otherParty, msg.ciphertext, msg.iv);
             const kind = msg.sender_id === currentUser.id ? 'sent' : 'received';
             appendChatMessage(plaintext, kind);
+            if (msg.sender_id !== currentUser.id) socket.emit('mark_read', { contactId: msg.sender_id });
         }
     });
 }
