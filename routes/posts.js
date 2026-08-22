@@ -28,7 +28,7 @@ function uploadToCloudinary(buffer, resourceType = 'image') {
 }
 
 const POST_SELECT = `
-    SELECT p.id, p.text, p.image_url, p.video_url, p.quote_text, p.repost_of, p.created_at,
+    SELECT p.id, p.text, p.image_url, p.video_url, p.quote_text, p.repost_of, p.is_reel, p.created_at,
            u.id AS author_id, u.name AS author_name, u.avatar_url AS author_avatar, u.is_verified,
            (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count,
            (SELECT COUNT(*) FROM posts r WHERE r.repost_of = p.id) AS share_count
@@ -52,10 +52,10 @@ async function attachCommentsAndOriginal(posts) {
     }
 }
 
-// Feed
+// Feed - excludes reels, which live in their own feed below
 router.get('/', async (req, res) => {
     try {
-        const postsResult = await pool.query(POST_SELECT + ' ORDER BY p.created_at DESC LIMIT 50');
+        const postsResult = await pool.query(POST_SELECT + ' WHERE p.is_reel = FALSE ORDER BY p.created_at DESC LIMIT 50');
         const posts = postsResult.rows;
         await attachCommentsAndOriginal(posts);
         res.json({ posts });
@@ -65,12 +65,30 @@ router.get('/', async (req, res) => {
     }
 });
 
+// Reels feed - only videos marked as reels, most recent first
+router.get('/reels', async (req, res) => {
+    try {
+        const postsResult = await pool.query(POST_SELECT + ' WHERE p.is_reel = TRUE ORDER BY p.created_at DESC LIMIT 50');
+        const posts = postsResult.rows;
+        await attachCommentsAndOriginal(posts);
+        res.json({ posts });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not load reels' });
+    }
+});
+
 // Create post - text, photo, or video. 'media' field can be either an image or a video file.
+// Set is_reel=true (form field, string "true") to publish a video to Reels instead of the main feed.
 router.post('/', requireAuth, upload.single('media'), async (req, res) => {
     try {
         const { text } = req.body;
+        const wantsReel = req.body.is_reel === 'true';
         if (!text && !req.file) {
             return res.status(400).json({ error: 'Post needs text or media' });
+        }
+        if (wantsReel && (!req.file || !req.file.mimetype.startsWith('video/'))) {
+            return res.status(400).json({ error: 'Reels require a video file' });
         }
         let imageUrl = null, videoUrl = null;
         if (req.file) {
@@ -79,14 +97,16 @@ router.post('/', requireAuth, upload.single('media'), async (req, res) => {
             if (isVideo) videoUrl = url; else imageUrl = url;
         }
         const result = await pool.query(
-            'INSERT INTO posts (user_id, text, image_url, video_url) VALUES ($1, $2, $3, $4) RETURNING id, text, image_url, video_url, created_at',
-            [req.userId, text || null, imageUrl, videoUrl]
+            'INSERT INTO posts (user_id, text, image_url, video_url, is_reel) VALUES ($1, $2, $3, $4, $5) RETURNING id, text, image_url, video_url, is_reel, created_at',
+            [req.userId, text || null, imageUrl, videoUrl, wantsReel]
         );
         await processHashtags(result.rows[0].id, text);
         res.json({ post: result.rows[0] });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Could not create post' });
+        // Surface the real error (e.g. Cloudinary auth failure) instead of a generic message,
+        // since a vague error makes it impossible to tell what actually went wrong.
+        res.status(500).json({ error: err.message || 'Could not create post' });
     }
 });
 

@@ -64,9 +64,12 @@
         <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
             <textarea id="newPostText" placeholder="What's on your mind? Use #hashtags" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
             <div class="flex items-center justify-between mt-2">
-                <input type="file" id="newPostMedia" accept="image/*,video/*" class="text-sm">
+                <input type="file" id="newPostMedia" accept="image/*,video/*" class="text-sm" onchange="handleComposerFileChange()">
                 <button onclick="createPost()" class="bg-primary text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700">Post</button>
             </div>
+            <label id="reelCheckboxWrap" class="hidden items-center gap-2 mt-2 text-sm text-gray-600">
+                <input type="checkbox" id="postAsReel"> Post as a Reel instead of a regular post
+            </label>
         </div>
         <div id="signedOutNotice" class="bg-white rounded-2xl shadow p-5 mb-6 text-center text-gray-500">
             <a class="text-primary font-medium cursor-pointer" onclick="openModal('authModal')">Sign in</a> to post, like, comment, and follow.
@@ -105,6 +108,11 @@
             <div class="tab-btn" data-tab="hashtags" onclick="switchSearchTab('hashtags')">Hashtags</div>
         </div>
         <div id="searchResults" class="space-y-3"></div>
+    </section>
+
+    <!-- REELS -->
+    <section id="reelsPage" class="page">
+        <div id="reelsContainer" class="space-y-4"></div>
     </section>
 
     <!-- NOTIFICATIONS -->
@@ -206,6 +214,7 @@
 <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 flex justify-around items-center py-2">
     <button onclick="showFeed()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-home"></i></button>
     <button onclick="switchPage('search')" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-search"></i></button>
+    <button onclick="showReels()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-film"></i></button>
     <button onclick="focusComposer()" class="flex flex-col items-center bg-primary text-white w-11 h-11 rounded-full text-xl -mt-1"><i class="fas fa-plus"></i></button>
     <button onclick="toggleChat()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-comment-dots"></i></button>
     <button onclick="openNotifications()" class="relative flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2">
@@ -454,22 +463,65 @@ function renderPostList(posts, containerId){
     document.getElementById(containerId).innerHTML = posts.map(renderPostCard).join('') || '<p class="text-center text-gray-400 py-10">Nothing here yet.</p>';
 }
 
+function handleComposerFileChange(){
+    const file = document.getElementById('newPostMedia').files[0];
+    const wrap = document.getElementById('reelCheckboxWrap');
+    if (file && file.type.startsWith('video/')) {
+        wrap.classList.remove('hidden'); wrap.classList.add('flex');
+    } else {
+        wrap.classList.add('hidden'); wrap.classList.remove('flex');
+        document.getElementById('postAsReel').checked = false;
+    }
+}
+
 async function createPost(){
     if (!currentUser) return openModal('authModal');
     const text = document.getElementById('newPostText').value.trim();
     const fileInput = document.getElementById('newPostMedia');
     const file = fileInput.files[0];
+    const isReel = document.getElementById('postAsReel').checked;
     if (!text && !file) return showToast('Write something or add media', 'error');
     try {
         const form = new FormData();
         if (text) form.append('text', text);
         if (file) form.append('media', file);
+        if (isReel) form.append('is_reel', 'true');
         await apiForm('/api/posts', form);
         document.getElementById('newPostText').value = '';
         fileInput.value = '';
-        showToast('Posted!');
+        document.getElementById('postAsReel').checked = false;
+        document.getElementById('reelCheckboxWrap').classList.add('hidden');
+        showToast(isReel ? 'Reel posted!' : 'Posted!');
         loadFeed();
     } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Reels ----
+async function showReels(){
+    switchPage('reels');
+    try {
+        const data = await api('/api/posts/reels');
+        renderReels(data.posts);
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+function renderReels(posts){
+    document.getElementById('reelsContainer').innerHTML = posts.map(p => `
+        <div class="bg-black rounded-2xl overflow-hidden shadow-lg relative">
+            <video src="${p.video_url}" class="w-full" style="max-height:70vh; object-fit:cover;" controls loop playsinline></video>
+            <div class="p-4 bg-white">
+                <div class="flex items-center mb-2 cursor-pointer" onclick="viewProfile(${p.author_id})">
+                    <div class="avatar w-8 h-8 mr-2 text-xs">${escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
+                    <span class="font-semibold text-sm">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary text-xs"></i>' : ''}</span>
+                </div>
+                ${p.text ? `<p class="text-sm text-gray-700 mb-2">${linkify(p.text)}</p>` : ''}
+                <div class="flex items-center gap-5 text-gray-500 text-sm">
+                    <button class="hover:text-red-500" onclick="toggleLike(${p.id})"><i class="far fa-heart"></i> ${p.like_count}</button>
+                    <span><i class="far fa-comment"></i> ${p.comments.length}</span>
+                </div>
+            </div>
+        </div>
+    `).join('') || '<p class="text-center text-gray-400 py-10">No reels yet. Post a video and check "Post as a Reel" to be the first!</p>';
 }
 
 async function toggleLike(id){
@@ -714,20 +766,48 @@ function showChatContactList(){
 }
 
 async function loadChatContacts(){
+    const listEl = document.getElementById('chatContactList');
     if (!currentUser) {
-        document.getElementById('chatContactList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Sign in to message people.</p>';
+        listEl.innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Sign in to message people.</p>';
         return;
     }
+    listEl.innerHTML = `
+        <div class="p-3 border-b">
+            <input id="chatSearchInput" type="text" placeholder="Search anyone to message" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" oninput="searchChatContacts(this.value)">
+        </div>
+        <div id="chatSearchResults"></div>
+        <div id="chatConversationsList"></div>
+    `;
     try {
-        const following = await api(`/api/users/${currentUser.id}/following`);
-        const list = following.following || [];
-        document.getElementById('chatContactList').innerHTML = list.map(u => `
-            <div class="contact-row" onclick="openConversation(${u.id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
+        const data = await api('/api/messages/conversations');
+        const list = data.conversations || [];
+        document.getElementById('chatConversationsList').innerHTML = list.map(u => `
+            <div class="contact-row" onclick="openConversation(${u.other_user_id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
                 <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
                 <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
             </div>
-        `).join('') || '<p class="text-center text-gray-400 p-6 text-sm">Follow people to start messaging them.</p>';
-    } catch { document.getElementById('chatContactList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Could not load contacts.</p>'; }
+        `).join('') || '<p class="text-center text-gray-400 p-6 text-sm">No conversations yet. Search above to message anyone.</p>';
+    } catch {
+        document.getElementById('chatConversationsList').innerHTML = '<p class="text-center text-gray-400 p-6 text-sm">Could not load conversations.</p>';
+    }
+}
+
+let chatSearchTimeout = null;
+function searchChatContacts(query){
+    clearTimeout(chatSearchTimeout);
+    const resultsEl = document.getElementById('chatSearchResults');
+    if (!query.trim()) { resultsEl.innerHTML = ''; return; }
+    chatSearchTimeout = setTimeout(async () => {
+        try {
+            const data = await api('/api/search?q=' + encodeURIComponent(query));
+            resultsEl.innerHTML = (data.users || []).filter(u => u.id !== currentUser.id).map(u => `
+                <div class="contact-row" onclick="openConversation(${u.id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
+                    <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                    <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
+                </div>
+            `).join('') || '<p class="text-center text-gray-400 p-3 text-xs">No matching people.</p>';
+        } catch {}
+    }, 300);
 }
 
 async function openConversation(userId, name){

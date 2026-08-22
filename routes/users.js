@@ -28,7 +28,7 @@ router.post('/me/photo', requireAuth, upload.single('photo'), async (req, res) =
         res.json({ url, type });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Could not upload photo' });
+        res.status(500).json({ error: err.message || 'Could not upload photo' });
     }
 });
 

@@ -117,3 +117,6 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS quote_text TEXT;
 -- would let it decrypt messages itself - only the two participants can.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS public_key TEXT;
 ALTER TABLE messages ADD COLUMN IF NOT EXISTS iv TEXT;
+
+-- Reels: short vertical videos, shown in their own feed separate from regular posts
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_reel BOOLEAN DEFAULT FALSE;
