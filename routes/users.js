@@ -1,4 +1,5 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const requireAuth = require('../middleware/auth');
 const multer = require('multer');
@@ -17,7 +18,23 @@ function uploadToCloudinary(buffer) {
     });
 }
 
+// Reads a JWT if present but never rejects the request if it's missing/invalid -
+// used on public profile routes that still need to know who's asking, so
+// privacy settings (followers-only, only-me) can be applied correctly.
+function optionalAuth(req) {
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith('Bearer ')) return null;
+    try {
+        const payload = jwt.verify(header.split(' ')[1], process.env.JWT_SECRET);
+        return payload.userId;
+    } catch {
+        return null;
+    }
+}
+
 // Upload avatar or cover photo. field name 'photo', query ?type=avatar|cover
+// Also posts an automatic "updated their profile/cover photo" entry to the
+// timeline, the same way Facebook does.
 router.post('/me/photo', requireAuth, upload.single('photo'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No photo provided' });
     const type = req.query.type === 'cover' ? 'cover' : 'avatar';
@@ -25,6 +42,10 @@ router.post('/me/photo', requireAuth, upload.single('photo'), async (req, res) =
         const url = await uploadToCloudinary(req.file.buffer);
         const column = type === 'cover' ? 'cover_photo_url' : 'avatar_url';
         await pool.query(`UPDATE users SET ${column} = $1 WHERE id = $2`, [url, req.userId]);
+        await pool.query(
+            'INSERT INTO posts (user_id, image_url, is_profile_update, profile_update_type) VALUES ($1, $2, TRUE, $3)',
+            [req.userId, url, type]
+        );
         res.json({ url, type });
     } catch (err) {
         console.error(err);
@@ -32,28 +53,56 @@ router.post('/me/photo', requireAuth, upload.single('photo'), async (req, res) =
     }
 });
 
+function checkFieldVisibility(privacy, viewerId, ownerId, isFollowing) {
+    if (viewerId === ownerId) return true;
+    if (privacy === 'public') return true;
+    if (privacy === 'followers') return isFollowing;
+    return false; // 'private'
+}
+
 // ---- Profile ----
 router.get('/:id', async (req, res) => {
     const targetId = req.params.id;
+    const viewerId = optionalAuth(req);
     try {
         const userResult = await pool.query(
-            'SELECT id, name, bio, avatar_url, is_verified, is_private, created_at FROM users WHERE id = $1',
+            `SELECT id, name, bio, avatar_url, cover_photo_url, is_verified, is_private, location, website,
+                    gender, gender_privacy, birthday, birthday_privacy, created_at
+             FROM users WHERE id = $1`,
             [targetId]
         );
-        if (!userResult.rows[0]) return res.status(404).json({ error: 'User not found' });
+        const user = userResult.rows[0];
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        let isFollowing = false;
+        if (viewerId) {
+            const f = await pool.query('SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2', [viewerId, targetId]);
+            isFollowing = f.rows.length > 0;
+        }
+
+        if (!checkFieldVisibility(user.gender_privacy, viewerId, Number(targetId), isFollowing)) {
+            user.gender = null;
+        }
+        if (!checkFieldVisibility(user.birthday_privacy, viewerId, Number(targetId), isFollowing)) {
+            user.birthday = null;
+        }
 
         const followerCount = await pool.query('SELECT COUNT(*) FROM follows WHERE following_id = $1', [targetId]);
         const followingCount = await pool.query('SELECT COUNT(*) FROM follows WHERE follower_id = $1', [targetId]);
 
         const postsResult = await pool.query(`
-            SELECT p.id, p.text, p.image_url, p.created_at,
+            SELECT p.id, p.text, p.image_url, p.video_url, p.is_profile_update, p.profile_update_type, p.created_at,
                    (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count
             FROM posts p WHERE p.user_id = $1
             ORDER BY p.created_at DESC LIMIT 30
         `, [targetId]);
+        for (const post of postsResult.rows) {
+            const media = await pool.query('SELECT media_url FROM post_media WHERE post_id = $1 ORDER BY position ASC', [post.id]);
+            post.media = media.rows.map(r => r.media_url);
+        }
 
         res.json({
-            user: userResult.rows[0],
+            user,
             follower_count: Number(followerCount.rows[0].count),
             following_count: Number(followingCount.rows[0].count),
             posts: postsResult.rows
@@ -65,11 +114,29 @@ router.get('/:id', async (req, res) => {
 });
 
 router.put('/me', requireAuth, async (req, res) => {
-    const { name, bio, avatar_url, cover_photo_url } = req.body;
+    const { name, bio, avatar_url, cover_photo_url, location, website, gender, gender_privacy, birthday, birthday_privacy } = req.body;
+    const validPrivacy = v => ['public', 'followers', 'private'].includes(v);
     try {
         const result = await pool.query(
-            'UPDATE users SET name = COALESCE($1, name), bio = COALESCE($2, bio), avatar_url = COALESCE($3, avatar_url), cover_photo_url = COALESCE($4, cover_photo_url) WHERE id = $5 RETURNING id, name, bio, avatar_url, cover_photo_url',
-            [name, bio, avatar_url, cover_photo_url, req.userId]
+            `UPDATE users SET
+                name = COALESCE($1, name),
+                bio = COALESCE($2, bio),
+                avatar_url = COALESCE($3, avatar_url),
+                cover_photo_url = COALESCE($4, cover_photo_url),
+                location = COALESCE($5, location),
+                website = COALESCE($6, website),
+                gender = COALESCE($7, gender),
+                gender_privacy = COALESCE($8, gender_privacy),
+                birthday = COALESCE($9, birthday),
+                birthday_privacy = COALESCE($10, birthday_privacy)
+             WHERE id = $11
+             RETURNING id, name, bio, avatar_url, cover_photo_url, location, website, gender, gender_privacy, birthday, birthday_privacy`,
+            [
+                name, bio, avatar_url, cover_photo_url, location, website,
+                gender, validPrivacy(gender_privacy) ? gender_privacy : null,
+                birthday, validPrivacy(birthday_privacy) ? birthday_privacy : null,
+                req.userId
+            ]
         );
         res.json({ user: result.rows[0] });
     } catch (err) {

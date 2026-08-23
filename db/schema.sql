@@ -148,3 +148,44 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_expires_at TIMESTAMPTZ;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires_at TIMESTAMPTZ;
+
+-- Stories: allow text-only stories (no media) plus a caption over photo/video stories
+ALTER TABLE stories ALTER COLUMN media_url DROP NOT NULL;
+ALTER TABLE stories ADD COLUMN IF NOT EXISTS caption TEXT;
+ALTER TABLE stories ADD COLUMN IF NOT EXISTS text_content TEXT;
+ALTER TABLE stories ADD COLUMN IF NOT EXISTS background_color TEXT;
+
+-- Multiple images per post (carousel). If a post has rows here, the frontend
+-- shows a swipeable carousel instead of the single image_url/video_url.
+CREATE TABLE IF NOT EXISTS post_media (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+    media_url TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0
+);
+ALTER TABLE post_media ADD COLUMN IF NOT EXISTS media_type TEXT NOT NULL DEFAULT 'image';
+
+-- One reaction per person per story (like/laugh/love/sad etc)
+CREATE TABLE IF NOT EXISTS story_reactions (
+    id SERIAL PRIMARY KEY,
+    story_id INTEGER REFERENCES stories(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    emoji TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(story_id, user_id)
+);
+
+-- Reshare tracking: when someone reshares a story to their own story
+ALTER TABLE stories ADD COLUMN IF NOT EXISTS shared_from_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Extra profile details, some with per-field privacy control
+ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender_privacy TEXT NOT NULL DEFAULT 'public'; -- 'public' | 'followers' | 'private'
+ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday DATE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday_privacy TEXT NOT NULL DEFAULT 'public';
+
+-- Marks a post as an automatic "updated their profile/cover photo" timeline entry
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_profile_update BOOLEAN DEFAULT FALSE;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS profile_update_type TEXT; -- 'avatar' | 'cover'

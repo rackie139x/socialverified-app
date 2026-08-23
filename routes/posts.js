@@ -28,7 +28,8 @@ function uploadToCloudinary(buffer, resourceType = 'image') {
 }
 
 const POST_SELECT = `
-    SELECT p.id, p.text, p.image_url, p.video_url, p.quote_text, p.repost_of, p.is_reel, p.created_at,
+    SELECT p.id, p.text, p.image_url, p.video_url, p.quote_text, p.repost_of, p.is_reel,
+           p.is_profile_update, p.profile_update_type, p.created_at,
            u.id AS author_id, u.name AS author_name, u.avatar_url AS author_avatar, u.is_verified,
            (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count,
            (SELECT COUNT(*) FROM posts r WHERE r.repost_of = p.id) AS share_count
@@ -45,9 +46,22 @@ async function attachCommentsAndOriginal(posts) {
         `, [post.id]);
         post.comments = comments.rows;
 
+        const media = await pool.query(
+            'SELECT media_url FROM post_media WHERE post_id = $1 ORDER BY position ASC',
+            [post.id]
+        );
+        post.media = media.rows.map(r => r.media_url); // carousel images, if any (empty array otherwise)
+
         if (post.repost_of) {
             const original = await pool.query(POST_SELECT + ' WHERE p.id = $1', [post.repost_of]);
             post.original_post = original.rows[0] || null;
+            if (post.original_post) {
+                const originalMedia = await pool.query(
+                    'SELECT media_url FROM post_media WHERE post_id = $1 ORDER BY position ASC',
+                    [post.original_post.id]
+                );
+                post.original_post.media = originalMedia.rows.map(r => r.media_url);
+            }
         }
     }
 }
@@ -78,30 +92,46 @@ router.get('/reels', async (req, res) => {
     }
 });
 
-// Create post - text, photo, or video. 'media' field can be either an image or a video file.
-// Set is_reel=true (form field, string "true") to publish a video to Reels instead of the main feed.
-router.post('/', requireAuth, upload.single('media'), async (req, res) => {
+// Create post - text, one video, or up to 5 photos (carousel).
+// 'media' field accepts multiple files. If any file is a video, only the
+// first one is used (videos don't carousel). Multiple images create a
+// swipeable carousel via the post_media table.
+// Set is_reel=true (form field, string "true") to publish a single video to Reels instead of the main feed.
+router.post('/', requireAuth, upload.array('media', 5), async (req, res) => {
     try {
         const { text } = req.body;
         const wantsReel = req.body.is_reel === 'true';
-        if (!text && !req.file) {
+        const files = req.files || [];
+        if (!text && files.length === 0) {
             return res.status(400).json({ error: 'Post needs text or media' });
         }
-        if (wantsReel && (!req.file || !req.file.mimetype.startsWith('video/'))) {
+        const videoFile = files.find(f => f.mimetype.startsWith('video/'));
+        if (wantsReel && !videoFile) {
             return res.status(400).json({ error: 'Reels require a video file' });
         }
-        let imageUrl = null, videoUrl = null;
-        if (req.file) {
-            const isVideo = req.file.mimetype.startsWith('video/');
-            const url = await uploadToCloudinary(req.file.buffer, isVideo ? 'video' : 'image');
-            if (isVideo) videoUrl = url; else imageUrl = url;
+
+        let imageUrl = null, videoUrl = null, carouselUrls = [];
+        if (videoFile) {
+            videoUrl = await uploadToCloudinary(videoFile.buffer, 'video');
+        } else if (files.length > 0) {
+            carouselUrls = await Promise.all(files.map(f => uploadToCloudinary(f.buffer, 'image')));
+            imageUrl = carouselUrls[0]; // first image also stored on the post row for backward compatibility
         }
+
         const result = await pool.query(
             'INSERT INTO posts (user_id, text, image_url, video_url, is_reel) VALUES ($1, $2, $3, $4, $5) RETURNING id, text, image_url, video_url, is_reel, created_at',
             [req.userId, text || null, imageUrl, videoUrl, wantsReel]
         );
-        await processHashtags(result.rows[0].id, text);
-        res.json({ post: result.rows[0] });
+        const postId = result.rows[0].id;
+
+        if (carouselUrls.length > 1) {
+            await Promise.all(carouselUrls.map((url, i) =>
+                pool.query('INSERT INTO post_media (post_id, media_url, media_type, position) VALUES ($1, $2, $3, $4)', [postId, url, 'image', i])
+            ));
+        }
+
+        await processHashtags(postId, text);
+        res.json({ post: { ...result.rows[0], media: carouselUrls } });
     } catch (err) {
         console.error(err);
         // Surface the real error (e.g. Cloudinary auth failure) instead of a generic message,

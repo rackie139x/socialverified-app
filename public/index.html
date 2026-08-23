@@ -16,10 +16,12 @@
     .page { display: none; } .page.active { display: block; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; }
     .modal-overlay.show { display: flex; }
-    .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; }
+    .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; position: relative; }
     .notification-toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 2100; transform: translateX(200%); transition: transform .3s ease; max-width: 320px; }
     .notification-toast.show { transform: translateX(0); }
     .post-image, .post-video { max-height: 420px; width: 100%; object-fit: cover; border-radius: 8px; }
+    .carousel-dot { width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; }
+    .carousel-dot.active { background: #4F46E5; }
     .avatar { border-radius: 50%; object-fit: cover; background: linear-gradient(135deg,#4F46E5,#EC4899); display:flex; align-items:center; justify-content:center; color:white; flex-shrink:0; }
     .cover-photo { height: 160px; width: 100%; object-fit: cover; border-radius: 12px 12px 0 0; background: linear-gradient(135deg,#4F46E5,#818CF8); }
     .hashtag { color: #4F46E5; cursor: pointer; font-weight: 500; }
@@ -69,7 +71,7 @@
         <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
             <textarea id="newPostText" placeholder="What's on your mind? Use #hashtags" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
             <div class="flex items-center justify-between mt-2">
-                <input type="file" id="newPostMedia" accept="image/*,video/*" class="text-sm" onchange="handleComposerFileChange()">
+                <input type="file" id="newPostMedia" accept="image/*,video/*" multiple class="text-sm" onchange="handleComposerFileChange()">
                 <button onclick="createPost()" class="bg-primary text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700">Post</button>
             </div>
             <label id="reelCheckboxWrap" class="hidden items-center gap-2 mt-2 text-sm text-gray-600">
@@ -93,6 +95,7 @@
                 </div>
                 <h2 id="profileName" class="text-2xl font-bold mt-3 flex items-center gap-1"></h2>
                 <p id="profileBio" class="text-gray-600 mt-1"></p>
+                <div id="profileDetails"></div>
                 <div class="flex gap-6 mt-3 text-sm">
                     <span class="cursor-pointer" onclick="openFollowList('followers')"><b id="followerCount">0</b> Followers</span>
                     <span class="cursor-pointer" onclick="openFollowList('following')"><b id="followingCount">0</b> Following</span>
@@ -142,10 +145,47 @@
         <input id="authEmail" type="email" placeholder="Email" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
         <input id="authPassword" type="password" placeholder="Password (min 8 characters)" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
         <button onclick="submitAuth()" id="authSubmitBtn" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700 mb-2">Sign In</button>
-        <p class="text-sm text-center text-gray-500">
+        <p class="text-sm text-center text-gray-500 mb-2">
             <span id="authToggleText">Don't have an account?</span>
             <a class="text-primary font-medium cursor-pointer" onclick="toggleAuthMode()" id="authToggleLink">Sign up</a>
         </p>
+        <p class="text-sm text-center">
+            <a class="text-gray-400 cursor-pointer" onclick="closeModal('authModal'); openModal('forgotPasswordModal')">Forgot password?</a>
+        </p>
+    </div>
+</div>
+
+<!-- Verify Email Modal -->
+<div id="verifyEmailModal" class="modal-overlay">
+    <div class="modal-box text-center">
+        <i class="fas fa-envelope-circle-check text-4xl text-primary mb-3"></i>
+        <h3 class="text-xl font-bold mb-2">Verify your email</h3>
+        <p class="text-sm text-gray-500 mb-4">We sent a 6-digit code to <span id="verifyEmailAddress" class="font-medium"></span>. Enter it below.</p>
+        <input id="verifyCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="000000" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3 text-center text-2xl tracking-widest">
+        <button onclick="submitVerifyEmail()" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700 mb-2">Verify</button>
+        <button onclick="resendVerificationCode()" class="text-sm text-primary font-medium">Resend code</button>
+        <p class="text-xs text-gray-400 mt-3 cursor-pointer" onclick="closeModal('verifyEmailModal')">Skip for now</p>
+    </div>
+</div>
+
+<!-- Forgot Password Modal -->
+<div id="forgotPasswordModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Reset Password</h3>
+            <button onclick="closeModal('forgotPasswordModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="forgotStep1">
+            <p class="text-sm text-gray-500 mb-3">Enter your account email and we'll send you a reset code.</p>
+            <input id="forgotEmail" type="email" placeholder="Email" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+            <button onclick="submitForgotPassword()" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700">Send Reset Code</button>
+        </div>
+        <div id="forgotStep2" class="hidden">
+            <p class="text-sm text-gray-500 mb-3">Enter the code sent to your email and choose a new password.</p>
+            <input id="resetCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="6-digit code" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3 text-center tracking-widest">
+            <input id="resetNewPassword" type="password" placeholder="New password (min 8 characters)" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+            <button onclick="submitResetPassword()" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700">Reset Password</button>
+        </div>
     </div>
 </div>
 
@@ -160,6 +200,36 @@
         <input id="editName" type="text" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1">
         <label class="text-sm font-medium text-gray-600">Bio</label>
         <textarea id="editBio" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1 min-h-[70px]"></textarea>
+        <label class="text-sm font-medium text-gray-600">Location</label>
+        <input id="editLocation" type="text" placeholder="e.g. Kisumu, Kenya" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1">
+        <label class="text-sm font-medium text-gray-600">Website</label>
+        <input id="editWebsite" type="text" placeholder="e.g. https://yoursite.com" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1">
+
+        <label class="text-sm font-medium text-gray-600">Gender</label>
+        <div class="flex gap-2 mb-3 mt-1">
+            <select id="editGender" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">Prefer not to say</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+            </select>
+            <select id="editGenderPrivacy" class="border border-gray-300 rounded-lg px-2 py-2 text-sm">
+                <option value="public">Public</option>
+                <option value="followers">Followers only</option>
+                <option value="private">Only me</option>
+            </select>
+        </div>
+
+        <label class="text-sm font-medium text-gray-600">Birthday</label>
+        <div class="flex gap-2 mb-3 mt-1">
+            <input id="editBirthday" type="date" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <select id="editBirthdayPrivacy" class="border border-gray-300 rounded-lg px-2 py-2 text-sm">
+                <option value="public">Public</option>
+                <option value="followers">Followers only</option>
+                <option value="private">Only me</option>
+            </select>
+        </div>
+
         <label class="text-sm font-medium text-gray-600">Profile photo</label>
         <input id="editAvatarFile" type="file" accept="image/*" class="w-full mb-3 mt-1 text-sm">
         <label class="text-sm font-medium text-gray-600">Cover photo</label>
@@ -244,13 +314,88 @@
             <div class="avatar w-8 h-8 text-xs" id="storyViewerAvatar"></div>
             <span class="font-medium text-sm" id="storyViewerName"></span>
         </div>
-        <button onclick="closeStoryViewer()" class="text-white text-2xl leading-none">&times;</button>
+        <div class="flex items-center gap-3">
+            <button onclick="shareStory()" class="text-white text-lg"><i class="fas fa-share"></i></button>
+            <button onclick="closeStoryViewer()" class="text-white text-2xl leading-none">&times;</button>
+        </div>
     </div>
-    <div class="flex-1 flex items-center justify-center relative" onclick="handleStoryTap(event)">
+    <div class="flex-1 flex items-center justify-center relative" onclick="handleStoryTap(event)" style="pointer-events:auto;">
         <div id="storyMediaWrap" class="w-full h-full flex items-center justify-center"></div>
+        <p id="storyCaptionOverlay" class="absolute bottom-24 left-4 right-4 text-white text-center font-medium" style="text-shadow:0 1px 4px rgba(0,0,0,.6);"></p>
+    </div>
+    <div class="flex justify-center gap-4 py-2" id="storyReactionBar" onclick="event.stopPropagation()">
+        <button onclick="reactToStory('❤️')" class="text-2xl">❤️</button>
+        <button onclick="reactToStory('😂')" class="text-2xl">😂</button>
+        <button onclick="reactToStory('😍')" class="text-2xl">😍</button>
+        <button onclick="reactToStory('😢')" class="text-2xl">😢</button>
+        <button onclick="reactToStory('👍')" class="text-2xl">👍</button>
+    </div>
+    <div class="flex p-3 gap-2" onclick="event.stopPropagation()">
+        <input id="storyReplyInput" type="text" placeholder="Reply to story..." class="flex-1 bg-white/10 text-white placeholder-white/60 border border-white/30 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') sendStoryReply()">
+        <button onclick="sendStoryReply()" class="text-white text-lg"><i class="fas fa-paper-plane"></i></button>
     </div>
 </div>
 <input type="file" id="storyFileInput" accept="image/*,video/*" class="hidden" onchange="uploadStory()">
+
+<!-- Photo Lightbox -->
+<div id="photoLightboxOverlay" class="story-viewer-overlay" onclick="closePhotoLightbox()">
+    <div class="flex-1 flex items-center justify-center p-4">
+        <img id="lightboxImage" src="" class="max-h-full max-w-full object-contain rounded-lg">
+    </div>
+    <button onclick="closePhotoLightbox()" class="absolute top-4 right-4 text-white text-3xl leading-none">&times;</button>
+</div>
+
+<!-- Create Story choice -->
+<div id="createStoryModal" class="modal-overlay">
+    <div class="modal-box text-center">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Add to Your Story</h3>
+            <button onclick="closeModal('createStoryModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <button onclick="closeModal('createStoryModal'); document.getElementById('storyFileInput').click()" class="w-full border-2 border-primary text-primary py-3 rounded-full font-bold mb-3"><i class="fas fa-image mr-2"></i>Photo or Video</button>
+        <button onclick="closeModal('createStoryModal'); openModal('textStoryModal')" class="w-full bg-primary text-white py-3 rounded-full font-bold"><i class="fas fa-font mr-2"></i>Write Something</button>
+    </div>
+</div>
+
+<!-- Photo/video story caption prompt -->
+<div id="storyCaptionModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Add a caption?</h3>
+            <button onclick="closeModal('storyCaptionModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <input id="storyCaptionInput" type="text" maxlength="100" placeholder="Say something about this... (optional)" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+        <button onclick="confirmStoryUpload()" class="w-full bg-primary text-white py-3 rounded-full font-bold">Post Story</button>
+    </div>
+</div>
+
+<!-- Text-only story composer -->
+<div id="textStoryModal" class="modal-overlay">
+    <div class="modal-box text-center" id="textStoryPreviewBox" style="background:#4F46E5; color:white; min-height:280px; display:flex; flex-direction:column; justify-content:center;">
+        <button onclick="closeModal('textStoryModal')" class="absolute text-white" style="top:12px; right:16px;"><i class="fas fa-times text-xl"></i></button>
+        <textarea id="textStoryInput" maxlength="200" placeholder="Type your story..." class="bg-transparent text-white text-xl font-medium text-center placeholder-white/70 border-none outline-none resize-none px-6" style="min-height:100px;" oninput="updateTextStoryPreview()"></textarea>
+        <div class="flex justify-center gap-2 mt-4">
+            <button onclick="setTextStoryColor('#4F46E5')" class="w-7 h-7 rounded-full" style="background:#4F46E5; border:2px solid white;"></button>
+            <button onclick="setTextStoryColor('#EC4899')" class="w-7 h-7 rounded-full" style="background:#EC4899; border:2px solid white;"></button>
+            <button onclick="setTextStoryColor('#10b981')" class="w-7 h-7 rounded-full" style="background:#10b981; border:2px solid white;"></button>
+            <button onclick="setTextStoryColor('#f59e0b')" class="w-7 h-7 rounded-full" style="background:#f59e0b; border:2px solid white;"></button>
+            <button onclick="setTextStoryColor('#1F2937')" class="w-7 h-7 rounded-full" style="background:#1F2937; border:2px solid white;"></button>
+        </div>
+        <button onclick="postTextStory()" class="bg-white text-dark mx-6 mt-4 py-3 rounded-full font-bold">Post Story</button>
+    </div>
+</div>
+
+<!-- Share story to a contact -->
+<div id="shareStoryModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Send to...</h3>
+            <button onclick="closeModal('shareStoryModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <input id="shareStorySearchInput" type="text" placeholder="Search people" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm mb-3" oninput="searchShareStoryContacts(this.value)">
+        <div id="shareStoryResults" class="space-y-1 max-h-60 overflow-y-auto"></div>
+    </div>
+</div>
 
 <nav class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-40 flex justify-around items-center py-2">
     <button onclick="showFeed()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-home"></i></button>
@@ -408,6 +553,7 @@ async function submitAuth(){
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     const name = document.getElementById('authName').value.trim();
+    const wasSignup = authMode === 'signup';
     try {
         const payload = authMode === 'login' ? { email, password } : { name, email, password };
         const data = await api('/api/auth/' + authMode, { method: 'POST', body: JSON.stringify(payload) });
@@ -417,6 +563,55 @@ async function submitAuth(){
         closeModal('authModal');
         onAuthed();
         showToast('Welcome, ' + currentUser.name + '!');
+        if (wasSignup) {
+            document.getElementById('verifyEmailAddress').textContent = email;
+            openModal('verifyEmailModal');
+        }
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function submitVerifyEmail(){
+    const code = document.getElementById('verifyCodeInput').value.trim();
+    if (!code) return showToast('Enter the code from your email', 'error');
+    try {
+        await api('/api/auth/verify-email', { method: 'POST', body: JSON.stringify({ code }) });
+        closeModal('verifyEmailModal');
+        showToast('Email verified!');
+        currentUser.email_verified = true;
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function resendVerificationCode(){
+    try {
+        await api('/api/auth/resend-verification', { method: 'POST' });
+        showToast('New code sent!');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function submitForgotPassword(){
+    const email = document.getElementById('forgotEmail').value.trim();
+    if (!email) return showToast('Enter your email', 'error');
+    try {
+        await api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+        document.getElementById('forgotStep1').classList.add('hidden');
+        document.getElementById('forgotStep2').classList.remove('hidden');
+        forgotPasswordEmail = email;
+        showToast('If that email has an account, a code was sent.');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+let forgotPasswordEmail = '';
+async function submitResetPassword(){
+    const code = document.getElementById('resetCodeInput').value.trim();
+    const newPassword = document.getElementById('resetNewPassword').value;
+    if (!code || !newPassword) return showToast('Fill in both fields', 'error');
+    try {
+        await api('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ email: forgotPasswordEmail, code, newPassword }) });
+        closeModal('forgotPasswordModal');
+        document.getElementById('forgotStep1').classList.remove('hidden');
+        document.getElementById('forgotStep2').classList.add('hidden');
+        showToast('Password reset! Sign in with your new password.');
+        openModal('authModal');
     } catch (err) { showToast(err.message, 'error'); }
 }
 
@@ -459,23 +654,91 @@ function linkify(text){
     return escapeHtml(text).replace(/#(\w+)/g, '<span class="hashtag" onclick="viewHashtag(\'$1\')">#$1</span>');
 }
 
+function renderMediaBlock(p, idPrefix){
+    // Multiple images -> swipeable carousel with dots and a download button per slide.
+    if (p.media && p.media.length > 1) {
+        const slides = p.media.map((url, i) => `
+            <div class="carousel-slide" style="display:${i === 0 ? 'block' : 'none'}" data-index="${i}">
+                <img src="${url}" class="post-image">
+                <button onclick="downloadMedia('${url}', 'photo-${i + 1}.jpg')" class="absolute top-2 right-2 bg-black/50 text-white w-8 h-8 rounded-full text-sm"><i class="fas fa-download"></i></button>
+            </div>
+        `).join('');
+        const dots = p.media.map((_, i) => `<span class="carousel-dot ${i === 0 ? 'active' : ''}" data-index="${i}"></span>`).join('');
+        return `
+            <div class="relative mb-3" id="carousel-${idPrefix}">
+                ${slides}
+                <button onclick="carouselNav('${idPrefix}', -1)" class="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 text-white w-8 h-8 rounded-full"><i class="fas fa-chevron-left"></i></button>
+                <button onclick="carouselNav('${idPrefix}', 1)" class="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 text-white w-8 h-8 rounded-full"><i class="fas fa-chevron-right"></i></button>
+                <div class="flex justify-center gap-1 mt-2">${dots}</div>
+            </div>`;
+    }
+    // Single image
+    if (p.image_url) {
+        return `<div class="relative mb-3">
+            <img src="${p.image_url}" class="post-image">
+            <button onclick="downloadMedia('${p.image_url}', 'photo.jpg')" class="absolute top-2 right-2 bg-black/50 text-white w-8 h-8 rounded-full text-sm"><i class="fas fa-download"></i></button>
+        </div>`;
+    }
+    // Single video
+    if (p.video_url) {
+        return `<div class="relative mb-3">
+            <video src="${p.video_url}" class="post-video" controls></video>
+            <button onclick="downloadMedia('${p.video_url}', 'video.mp4')" class="absolute top-2 right-2 bg-black/50 text-white w-8 h-8 rounded-full text-sm"><i class="fas fa-download"></i></button>
+        </div>`;
+    }
+    return '';
+}
+
+function carouselNav(idPrefix, direction){
+    const container = document.getElementById('carousel-' + idPrefix);
+    if (!container) return;
+    const slides = [...container.querySelectorAll('.carousel-slide')];
+    const dots = [...container.querySelectorAll('.carousel-dot')];
+    let current = slides.findIndex(s => s.style.display !== 'none');
+    slides[current].style.display = 'none';
+    dots[current].classList.remove('active');
+    current = (current + direction + slides.length) % slides.length;
+    slides[current].style.display = 'block';
+    dots[current].classList.add('active');
+}
+
+async function downloadMedia(url, filename){
+    try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objectUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objectUrl);
+    } catch {
+        window.open(url, '_blank'); // fallback: open in a new tab if the blob download is blocked
+    }
+}
+
 function renderPostCard(p){
     const isRepost = !!p.repost_of;
     const original = p.original_post;
+    const profileUpdateLabel = p.is_profile_update
+        ? `<p class="text-sm text-gray-500 mb-2">${escapeHtml(p.author_name)} updated ${p.profile_update_type === 'cover' ? 'their cover photo' : 'their profile photo'}</p>`
+        : '';
     return `
         <div class="bg-white rounded-2xl shadow-lg p-5">
             ${isRepost ? `<p class="text-xs text-gray-400 mb-2"><i class="fas fa-retweet mr-1"></i>${escapeHtml(p.author_name)} shared</p>` : ''}
-            <div class="flex items-center mb-3 cursor-pointer" onclick="viewProfile(${p.author_id})">
-                <div class="avatar w-11 h-11 mr-3">${p.author_avatar ? `<img src="${p.author_avatar}" class="w-full h-full rounded-full object-cover">` : escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
-                <div>
+            <div class="flex items-center mb-3">
+                <div class="avatar w-11 h-11 mr-3 cursor-pointer" onclick="${p.author_avatar ? `openPhotoLightbox('${p.author_avatar}')` : `viewProfile(${p.author_id})`}">${p.author_avatar ? `<img src="${p.author_avatar}" class="w-full h-full rounded-full object-cover">` : escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
+                <div class="cursor-pointer" onclick="viewProfile(${p.author_id})">
                     <h4 class="font-bold flex items-center">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary ml-1"></i>' : ''}</h4>
                     <p class="text-xs text-gray-400">${new Date(p.created_at).toLocaleString()}</p>
                 </div>
             </div>
+            ${profileUpdateLabel}
             ${p.text ? `<p class="text-gray-700 mb-3 whitespace-pre-wrap">${linkify(p.text)}</p>` : ''}
             ${p.quote_text ? `<p class="text-gray-700 mb-3 whitespace-pre-wrap">${linkify(p.quote_text)}</p>` : ''}
-            ${p.image_url ? `<img src="${p.image_url}" class="post-image mb-3">` : ''}
-            ${p.video_url ? `<video src="${p.video_url}" class="post-video mb-3" controls></video>` : ''}
+            ${renderMediaBlock(p, 'p' + p.id)}
             ${isRepost && original ? `
                 <div class="border border-gray-200 rounded-xl p-3 mb-3">
                     <div class="flex items-center mb-2 cursor-pointer" onclick="viewProfile(${original.author_id})">
@@ -483,8 +746,7 @@ function renderPostCard(p){
                         <span class="font-semibold text-sm">${escapeHtml(original.author_name)}</span>
                     </div>
                     ${original.text ? `<p class="text-sm text-gray-600 mb-2">${linkify(original.text)}</p>` : ''}
-                    ${original.image_url ? `<img src="${original.image_url}" class="post-image">` : ''}
-                    ${original.video_url ? `<video src="${original.video_url}" class="post-video" controls></video>` : ''}
+                    ${renderMediaBlock(original, 'orig' + p.id)}
                 </div>` : ''}
             <div class="flex items-center justify-between text-gray-500 border-t pt-3">
                 <button class="hover:text-red-500" onclick="toggleLike(${p.id})"><i class="far fa-heart"></i> ${p.like_count}</button>
@@ -507,27 +769,28 @@ function renderPostList(posts, containerId){
 }
 
 function handleComposerFileChange(){
-    const file = document.getElementById('newPostMedia').files[0];
+    const files = document.getElementById('newPostMedia').files;
     const wrap = document.getElementById('reelCheckboxWrap');
-    if (file && file.type.startsWith('video/')) {
+    if (files.length === 1 && files[0].type.startsWith('video/')) {
         wrap.classList.remove('hidden'); wrap.classList.add('flex');
     } else {
         wrap.classList.add('hidden'); wrap.classList.remove('flex');
         document.getElementById('postAsReel').checked = false;
     }
+    if (files.length > 1) showToast(`${files.length} photos selected`, 'info');
 }
 
 async function createPost(){
     if (!currentUser) return openModal('authModal');
     const text = document.getElementById('newPostText').value.trim();
     const fileInput = document.getElementById('newPostMedia');
-    const file = fileInput.files[0];
+    const files = fileInput.files;
     const isReel = document.getElementById('postAsReel').checked;
-    if (!text && !file) return showToast('Write something or add media', 'error');
+    if (!text && files.length === 0) return showToast('Write something or add media', 'error');
     try {
         const form = new FormData();
         if (text) form.append('text', text);
-        if (file) form.append('media', file);
+        for (const file of files) form.append('media', file);
         if (isReel) form.append('is_reel', 'true');
         await apiForm('/api/posts', form);
         document.getElementById('newPostText').value = '';
@@ -616,10 +879,27 @@ async function viewProfile(userId){
     try {
         const data = await api(`/api/users/${userId}`);
         const u = data.user;
-        document.getElementById('profileCover').src = u.cover_photo_url || 'https://placehold.co/600x160/4F46E5/FFFFFF?text=';
-        document.getElementById('profileAvatarWrap').innerHTML = u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : u.name.charAt(0).toUpperCase();
+        const coverEl = document.getElementById('profileCover');
+        coverEl.src = u.cover_photo_url || 'https://placehold.co/600x160/4F46E5/FFFFFF?text=';
+        coverEl.style.cursor = u.cover_photo_url ? 'pointer' : 'default';
+        coverEl.onclick = u.cover_photo_url ? () => openPhotoLightbox(u.cover_photo_url) : null;
+
+        const avatarWrap = document.getElementById('profileAvatarWrap');
+        avatarWrap.innerHTML = u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : u.name.charAt(0).toUpperCase();
+        avatarWrap.style.cursor = u.avatar_url ? 'pointer' : 'default';
+        avatarWrap.onclick = u.avatar_url ? () => openPhotoLightbox(u.avatar_url) : null;
+
         document.getElementById('profileName').innerHTML = `${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary text-lg"></i>' : ''} ${u.is_private ? '<i class="fas fa-lock text-gray-400 text-sm"></i>' : ''}`;
         document.getElementById('profileBio').textContent = u.bio || '';
+
+        const detailParts = [];
+        if (u.location) detailParts.push(`<span><i class="fas fa-location-dot mr-1"></i>${escapeHtml(u.location)}</span>`);
+        if (u.website) detailParts.push(`<a href="${escapeHtml(u.website)}" target="_blank" rel="noopener" class="text-primary"><i class="fas fa-link mr-1"></i>${escapeHtml(u.website)}</a>`);
+        if (u.gender) detailParts.push(`<span><i class="fas fa-venus-mars mr-1"></i>${escapeHtml(u.gender)}</span>`);
+        if (u.birthday) detailParts.push(`<span><i class="fas fa-cake-candles mr-1"></i>${new Date(u.birthday).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}</span>`);
+        document.getElementById('profileDetails').innerHTML = detailParts.length
+            ? `<div class="flex flex-wrap gap-4 text-sm text-gray-500 mt-2">${detailParts.join('')}</div>` : '';
+
         document.getElementById('followerCount').textContent = data.follower_count;
         document.getElementById('followingCount').textContent = data.following_count;
         renderPostList(data.posts.map(p => ({ ...p, author_id: u.id, author_name: u.name, author_avatar: u.avatar_url, is_verified: u.is_verified, comments: p.comments || [] })), 'profilePosts');
@@ -673,8 +953,15 @@ async function openFollowList(type){
 function openEditProfile(){
     document.getElementById('editName').value = currentUser.name || '';
     api(`/api/users/${currentUser.id}`).then(data => {
-        document.getElementById('editBio').value = data.user.bio || '';
-        document.getElementById('editPrivate').checked = !!data.user.is_private;
+        const u = data.user;
+        document.getElementById('editBio').value = u.bio || '';
+        document.getElementById('editPrivate').checked = !!u.is_private;
+        document.getElementById('editLocation').value = u.location || '';
+        document.getElementById('editWebsite').value = u.website || '';
+        document.getElementById('editGender').value = u.gender || '';
+        document.getElementById('editGenderPrivacy').value = u.gender_privacy || 'public';
+        document.getElementById('editBirthday').value = u.birthday ? u.birthday.split('T')[0] : '';
+        document.getElementById('editBirthdayPrivacy').value = u.birthday_privacy || 'public';
     });
     openModal('editProfileModal');
 }
@@ -683,10 +970,19 @@ async function saveProfileEdits(){
     const name = document.getElementById('editName').value.trim();
     const bio = document.getElementById('editBio').value.trim();
     const isPrivate = document.getElementById('editPrivate').checked;
+    const location = document.getElementById('editLocation').value.trim();
+    const website = document.getElementById('editWebsite').value.trim();
+    const gender = document.getElementById('editGender').value;
+    const gender_privacy = document.getElementById('editGenderPrivacy').value;
+    const birthday = document.getElementById('editBirthday').value;
+    const birthday_privacy = document.getElementById('editBirthdayPrivacy').value;
     const avatarFile = document.getElementById('editAvatarFile').files[0];
     const coverFile = document.getElementById('editCoverFile').files[0];
     try {
-        await api('/api/users/me', { method: 'PUT', body: JSON.stringify({ name, bio }) });
+        await api('/api/users/me', { method: 'PUT', body: JSON.stringify({
+            name, bio, location: location || null, website: website || null,
+            gender: gender || null, gender_privacy, birthday: birthday || null, birthday_privacy
+        }) });
         await api('/api/users/me/privacy', { method: 'PUT', body: JSON.stringify({ is_private: isPrivate }) });
         if (avatarFile) {
             const form = new FormData(); form.append('photo', avatarFile);
@@ -802,6 +1098,8 @@ function showMessages(){
 // ---- Stories ----
 let storiesGrouped = [];
 let storyViewerState = { authorIndex: 0, storyIndex: 0, timer: null };
+let pendingStoryFile = null;
+let textStoryColor = '#4F46E5';
 
 async function loadStories(){
     try {
@@ -822,7 +1120,7 @@ function renderStoriesBar(){
     if (currentUser) {
         const mine = storiesGrouped.find(g => g.author_id === currentUser.id);
         html += `
-            <div class="story-circle" onclick="${mine ? `openStoryViewer(${storiesGrouped.indexOf(mine)})` : "document.getElementById('storyFileInput').click()"}">
+            <div class="story-circle" onclick="${mine ? `openStoryViewer(${storiesGrouped.indexOf(mine)})` : "openModal('createStoryModal')"}">
                 <div class="story-ring ${mine ? '' : 'own'}">
                     <div class="story-ring-inner">
                         <div class="avatar w-full h-full text-sm">${currentUser.name.charAt(0).toUpperCase()}</div>
@@ -846,15 +1144,44 @@ function renderStoriesBar(){
     bar.innerHTML = html;
 }
 
-async function uploadStory(){
+// Step 1: file picked -> ask for an optional caption before uploading
+function uploadStory(){
     const file = document.getElementById('storyFileInput').files[0];
     if (!file || !currentUser) return;
+    pendingStoryFile = file;
+    document.getElementById('storyCaptionInput').value = '';
+    openModal('storyCaptionModal');
+}
+
+async function confirmStoryUpload(){
+    const caption = document.getElementById('storyCaptionInput').value.trim();
     try {
         const form = new FormData();
-        form.append('media', file);
+        form.append('media', pendingStoryFile);
+        if (caption) form.append('caption', caption);
         await apiForm('/api/stories', form);
         showToast('Story posted! It disappears in 24 hours.');
         document.getElementById('storyFileInput').value = '';
+        pendingStoryFile = null;
+        closeModal('storyCaptionModal');
+        loadStories();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+function updateTextStoryPreview(){ /* live-typing needs no extra work, textarea already shows it */ }
+function setTextStoryColor(color){
+    textStoryColor = color;
+    document.getElementById('textStoryPreviewBox').style.background = color;
+}
+
+async function postTextStory(){
+    const text = document.getElementById('textStoryInput').value.trim();
+    if (!text) return showToast('Write something first', 'error');
+    try {
+        await api('/api/stories', { method: 'POST', body: JSON.stringify({ text_content: text, background_color: textStoryColor }), headers: { 'Content-Type': 'application/json' } });
+        showToast('Story posted!');
+        document.getElementById('textStoryInput').value = '';
+        closeModal('textStoryModal');
         loadStories();
     } catch (err) { showToast(err.message, 'error'); }
 }
@@ -866,10 +1193,19 @@ function openStoryViewer(authorIndex){
     renderCurrentStory();
 }
 
+function openPhotoLightbox(url){
+    document.getElementById('lightboxImage').src = url;
+    document.getElementById('photoLightboxOverlay').classList.add('show');
+}
+function closePhotoLightbox(){
+    document.getElementById('photoLightboxOverlay').classList.remove('show');
+}
+
 function closeStoryViewer(){
     clearTimeout(storyViewerState.timer);
     document.getElementById('storyViewerOverlay').classList.remove('show');
     document.getElementById('storyMediaWrap').innerHTML = '';
+    document.getElementById('storyReplyInput').value = '';
 }
 
 function renderCurrentStory(){
@@ -881,17 +1217,30 @@ function renderCurrentStory(){
 
     document.getElementById('storyViewerAvatar').textContent = group.author_name.charAt(0).toUpperCase();
     document.getElementById('storyViewerName').textContent = group.author_name;
+    document.getElementById('storyCaptionOverlay').textContent = story.caption || '';
+
+    // Hide your own reaction/reply controls on your own story - replying to yourself makes no sense
+    const isOwnStory = currentUser && group.author_id === currentUser.id;
+    document.getElementById('storyReactionBar').style.display = isOwnStory ? 'none' : 'flex';
+    document.getElementById('storyReplyInput').parentElement.style.display = isOwnStory ? 'none' : 'flex';
 
     const wrap = document.getElementById('storyMediaWrap');
     if (story.media_type === 'video') {
         wrap.innerHTML = `<video src="${story.media_url}" class="max-h-full max-w-full" autoplay playsinline onended="advanceStory()"></video>`;
+    } else if (story.media_type === 'text') {
+        wrap.innerHTML = `<div class="w-full h-full flex items-center justify-center px-8" style="background:${story.background_color || '#4F46E5'}"><p class="text-white text-2xl font-medium text-center">${escapeHtml(story.text_content)}</p></div>`;
+        armStoryTimer();
     } else {
         wrap.innerHTML = `<img src="${story.media_url}" class="max-h-full max-w-full object-contain">`;
-        const fill = document.getElementById('storyProgressFill');
-        fill.style.transition = 'none'; fill.style.width = '0%';
-        requestAnimationFrame(() => { fill.style.transition = 'width 5s linear'; fill.style.width = '100%'; });
-        storyViewerState.timer = setTimeout(advanceStory, 5000);
+        armStoryTimer();
     }
+}
+
+function armStoryTimer(){
+    const fill = document.getElementById('storyProgressFill');
+    fill.style.transition = 'none'; fill.style.width = '0%';
+    requestAnimationFrame(() => { fill.style.transition = 'width 5s linear'; fill.style.width = '100%'; });
+    storyViewerState.timer = setTimeout(advanceStory, 5000);
 }
 
 function advanceStory(){
@@ -922,6 +1271,79 @@ function goBackStory(){
 function handleStoryTap(event){
     const isRightSide = event.clientX > window.innerWidth / 2;
     if (isRightSide) advanceStory(); else goBackStory();
+}
+
+function currentStoryOwnerId(){
+    const group = storiesGrouped[storyViewerState.authorIndex];
+    return group ? group.author_id : null;
+}
+
+// Reactions and replies to a story are delivered as an encrypted DM to the
+// story's owner - same pattern as Instagram, and it reuses the E2EE chat
+// system we already have rather than building a separate reactions store.
+async function reactToStory(emoji){
+    if (!currentUser) return openModal('authModal');
+    const ownerId = currentStoryOwnerId();
+    if (!ownerId) return;
+    try {
+        const { ciphertext, iv } = await encryptForContact(ownerId, `${emoji} Reacted to your story`);
+        socket.emit('direct_message', { recipientId: ownerId, ciphertext, iv });
+        showToast('Sent!');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function sendStoryReply(){
+    if (!currentUser) return openModal('authModal');
+    const input = document.getElementById('storyReplyInput');
+    const text = input.value.trim();
+    if (!text) return;
+    const ownerId = currentStoryOwnerId();
+    if (!ownerId) return;
+    try {
+        const { ciphertext, iv } = await encryptForContact(ownerId, `Replying to your story: ${text}`);
+        socket.emit('direct_message', { recipientId: ownerId, ciphertext, iv });
+        input.value = '';
+        showToast('Reply sent!');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+let pendingShareStoryUrl = null;
+function shareStory(){
+    if (!currentUser) return openModal('authModal');
+    const group = storiesGrouped[storyViewerState.authorIndex];
+    const story = group?.stories[storyViewerState.storyIndex];
+    if (!story) return;
+    pendingShareStoryUrl = story.media_url || null;
+    document.getElementById('shareStoryResults').innerHTML = '';
+    document.getElementById('shareStorySearchInput').value = '';
+    openModal('shareStoryModal');
+}
+
+let shareStorySearchTimeout = null;
+function searchShareStoryContacts(query){
+    clearTimeout(shareStorySearchTimeout);
+    if (!query.trim()) { document.getElementById('shareStoryResults').innerHTML = ''; return; }
+    shareStorySearchTimeout = setTimeout(async () => {
+        try {
+            const data = await api('/api/search?q=' + encodeURIComponent(query));
+            document.getElementById('shareStoryResults').innerHTML = (data.users || []).filter(u => u.id !== currentUser.id).map(u => `
+                <div class="contact-row" onclick="sendStoryShareTo(${u.id})">
+                    <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                    <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
+                </div>
+            `).join('') || '<p class="text-center text-gray-400 p-3 text-xs">No matching people.</p>';
+        } catch {}
+    }, 300);
+}
+
+async function sendStoryShareTo(userId){
+    try {
+        const message = pendingShareStoryUrl ? `Shared a story with you: ${pendingShareStoryUrl}` : 'Shared a story with you';
+        const { ciphertext, iv } = await encryptForContact(userId, message);
+        socket.emit('direct_message', { recipientId: userId, ciphertext, iv });
+        closeModal('shareStoryModal');
+        showToast('Story shared!');
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
 function showChatContactList(){
