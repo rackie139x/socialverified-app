@@ -201,7 +201,7 @@
             </div>
             <button onclick="closeModal('accountSettingsModal'); openEditProfile()" class="w-full text-left py-3 border-b flex items-center gap-3"><i class="fas fa-user-pen w-5 text-gray-500"></i> Edit profile</button>
             <button onclick="closeModal('accountSettingsModal'); showBlockedUsers()" class="w-full text-left py-3 border-b flex items-center gap-3"><i class="fas fa-user-slash w-5 text-gray-500"></i> Blocked accounts</button>
-            <button onclick="closeModal('accountSettingsModal'); openModal('messageSettingsModal')" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-comment-dots w-5 text-gray-500"></i> Message settings</button>
+            <button onclick="closeModal('accountSettingsModal'); openMessageSettings()" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-comment-dots w-5 text-gray-500"></i> Message settings</button>
         </div>
     </div>
 
@@ -419,7 +419,7 @@
         <div class="p-4 border-b flex items-center gap-3 bg-gradient-to-r from-primary to-secondary text-white">
             <button id="chatBackBtn" onclick="showChatContactList()" class="hidden text-white"><i class="fas fa-arrow-left"></i></button>
             <h3 class="font-bold flex-1" id="chatHeaderTitle">Messages</h3>
-            <button id="chatSettingsBtn" onclick="openModal('messageSettingsModal')" class="text-white"><i class="fas fa-gear"></i></button>
+            <button id="chatSettingsBtn" onclick="openMessageSettings()" class="text-white"><i class="fas fa-gear"></i></button>
             <button id="chatSearchToggleBtn" onclick="document.getElementById('chatSearchInput')?.focus()" class="text-white"><i class="fas fa-magnifying-glass"></i></button>
         </div>
         <div id="chatContactList" class="overflow-y-auto flex-1"></div>
@@ -442,14 +442,29 @@
             <button onclick="closeModal('messageSettingsModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
         </div>
         <p class="text-sm text-gray-500 mb-3">All your messages are end-to-end encrypted - not even SocialVerified can read them.</p>
+
         <label class="flex items-center justify-between py-2 border-b">
-            <span class="text-sm">Show active status / last seen</span>
-            <input type="checkbox" id="showActiveStatusToggle" checked onchange="localStorage.setItem('sv_show_active', this.checked)">
+            <span class="text-sm">Active status</span>
+            <input type="checkbox" id="showActiveStatusToggle" checked onchange="toggleActiveStatus(this.checked)">
         </label>
-        <label class="flex items-center justify-between py-2">
+        <label class="flex items-center justify-between py-2 border-b">
             <span class="text-sm">Send read receipts</span>
             <input type="checkbox" id="sendReadReceiptsToggle" checked onchange="localStorage.setItem('sv_send_read_receipts', this.checked)">
         </label>
+        <label class="flex items-center justify-between py-2 border-b">
+            <span class="text-sm">Messaging notifications</span>
+            <input type="checkbox" id="messageNotificationsToggle" checked onchange="localStorage.setItem('sv_message_notifications', this.checked)">
+        </label>
+        <label class="flex items-center justify-between py-2 border-b">
+            <span class="text-sm">Message preview in list</span>
+            <input type="checkbox" id="messagePreviewToggle" checked onchange="localStorage.setItem('sv_message_preview', this.checked); loadChatContacts()">
+        </label>
+
+        <button onclick="showToast('Message requests are coming in a future update', 'info')" class="w-full text-left py-3 border-b flex items-center justify-between text-sm text-gray-400"><span>Message requests</span><i class="fas fa-chevron-right text-xs"></i></button>
+        <button onclick="closeModal('messageSettingsModal'); showBlockedUsers()" class="w-full text-left py-3 border-b flex items-center justify-between text-sm"><span>Privacy and safety</span><i class="fas fa-chevron-right text-xs text-gray-400"></i></button>
+        <button onclick="showToast('Archive is coming in a future update', 'info')" class="w-full text-left py-3 border-b flex items-center justify-between text-sm text-gray-400"><span>Archive</span><i class="fas fa-chevron-right text-xs"></i></button>
+        <button onclick="showToast('Chat lock is coming in a future update', 'info')" class="w-full text-left py-3 border-b flex items-center justify-between text-sm text-gray-400"><span>Chat lock</span><i class="fas fa-chevron-right text-xs"></i></button>
+        <button onclick="showToast('Channel/group invites are coming in a future update', 'info')" class="w-full text-left py-3 flex items-center justify-between text-sm text-gray-400"><span>Channel / group invite</span><i class="fas fa-chevron-right text-xs"></i></button>
     </div>
 </div>
 
@@ -1907,11 +1922,15 @@ async function loadChatContacts(){
         const list = data.conversations || [];
         const rows = await Promise.all(list.map(async u => {
             let preview = '...';
-            try { preview = await decryptFromContact(u.other_user_id, u.last_ciphertext, u.last_iv); } catch {}
+            if (localStorage.getItem('sv_message_preview') === 'false') {
+                preview = 'New message';
+            } else {
+                try { preview = await decryptFromContact(u.other_user_id, u.last_ciphertext, u.last_iv); } catch {}
+            }
             const isMine = u.last_sender_id === currentUser.id;
             const prefix = isMine ? 'You: ' : '';
             const readIcon = isMine ? `<i class="fas fa-check${u.last_is_read ? '-double text-primary' : ''} text-xs text-gray-400 ml-1"></i>` : '';
-            const isOnline = onlineUserIds.has(u.other_user_id);
+            const isOnline = localStorage.getItem('sv_show_active') !== 'false' && onlineUserIds.has(u.other_user_id);
             return `
                 <div class="contact-row" onclick="openConversation(${u.other_user_id}, '${escapeHtml(u.name).replace(/'/g,"\\'")}')">
                     <div class="relative">
@@ -2013,14 +2032,35 @@ async function openConversation(userId, name){
             const plaintext = await decryptFromContact(otherParty, msg.ciphertext, msg.iv);
             appendChatMessage(plaintext, msg.sender_id === currentUser.id ? 'sent' : 'received');
         }
-        if (socket) socket.emit('mark_read', { contactId: userId });
+        if (readReceiptsEnabled() && socket) socket.emit('mark_read', { contactId: userId });
     } catch (err) {
         wrap.innerHTML = `<p class="text-center text-gray-400 text-sm py-4">${escapeHtml(err.message)}</p>`;
     }
 }
 
+function openMessageSettings(){
+    document.getElementById('showActiveStatusToggle').checked = localStorage.getItem('sv_show_active') !== 'false';
+    document.getElementById('sendReadReceiptsToggle').checked = localStorage.getItem('sv_send_read_receipts') !== 'false';
+    document.getElementById('messageNotificationsToggle').checked = localStorage.getItem('sv_message_notifications') !== 'false';
+    document.getElementById('messagePreviewToggle').checked = localStorage.getItem('sv_message_preview') !== 'false';
+    openModal('messageSettingsModal');
+}
+
+function readReceiptsEnabled(){
+    return localStorage.getItem('sv_send_read_receipts') !== 'false';
+}
+function messageNotificationsEnabled(){
+    return localStorage.getItem('sv_message_notifications') !== 'false';
+}
+
+function toggleActiveStatus(visible){
+    localStorage.setItem('sv_show_active', visible);
+    if (socket) socket.emit('set_active_status', { visible });
+}
+
 function connectChat(){
     socket = io({ auth: { token } });
+    socket.emit('set_active_status', { visible: localStorage.getItem('sv_show_active') !== 'false' });
     socket.on('presence_update', ({ online }) => {
         onlineUserIds = new Set(online);
     });
@@ -2030,13 +2070,17 @@ function connectChat(){
         }
     });
     socket.on('direct_message', async (msg) => {
+        const onMessagesPage = document.getElementById('messagesPage').classList.contains('active');
         const relevant = (msg.sender_id === currentChatContact) || (msg.sender_id === currentUser.id && msg.recipient_id === currentChatContact);
         if (relevant) {
             const otherParty = msg.sender_id === currentUser.id ? msg.recipient_id : msg.sender_id;
             const plaintext = await decryptFromContact(otherParty, msg.ciphertext, msg.iv);
             const kind = msg.sender_id === currentUser.id ? 'sent' : 'received';
             appendChatMessage(plaintext, kind);
-            if (msg.sender_id !== currentUser.id) socket.emit('mark_read', { contactId: msg.sender_id });
+            if (msg.sender_id !== currentUser.id && readReceiptsEnabled()) socket.emit('mark_read', { contactId: msg.sender_id });
+        } else if (msg.sender_id !== currentUser.id && messageNotificationsEnabled()) {
+            // A message arrived for a conversation we're not currently viewing
+            showToast('New message', 'info');
         }
     });
 }

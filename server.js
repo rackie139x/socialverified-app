@@ -52,15 +52,27 @@ io.use((socket, next) => {
 });
 
 const onlineUsers = new Map(); // userId -> socket.id
+const invisibleUsers = new Set(); // userIds who've turned off "active status"
 
 function broadcastPresence(){
-    io.emit('presence_update', { online: [...onlineUsers.keys()] });
+    const visibleOnline = [...onlineUsers.keys()].filter(id => !invisibleUsers.has(id));
+    io.emit('presence_update', { online: visibleOnline });
 }
 
 io.on('connection', (socket) => {
     onlineUsers.set(socket.userId, socket.id);
     broadcastPresence();
-    socket.emit('presence_update', { online: [...onlineUsers.keys()] }); // give the new connection the current list right away
+    socket.emit('presence_update', { online: [...onlineUsers.keys()].filter(id => !invisibleUsers.has(id)) });
+
+    // Turning off "active status" hides you from everyone else's online indicators.
+    // As a fair trade-off (same as WhatsApp/Instagram), you also stop seeing
+    // other people's online status while this is off - enforced client-side
+    // by simply not rendering presence dots when the toggle is off.
+    socket.on('set_active_status', ({ visible }) => {
+        if (visible) invisibleUsers.delete(socket.userId);
+        else invisibleUsers.add(socket.userId);
+        broadcastPresence();
+    });
 
     socket.on('direct_message', async ({ recipientId, ciphertext, iv }) => {
         if (!ciphertext || !iv) return;
