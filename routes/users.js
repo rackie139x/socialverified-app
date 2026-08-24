@@ -381,19 +381,4 @@ router.get('/:id/mentions', async (req, res) => {
     }
 });
 
-// ---- Saved / bookmarked posts ----
-router.get('/me/saved', requireAuth, async (req, res) => {
-    const result = await pool.query(`
-        SELECT p.id, p.text, p.image_url, p.video_url, p.created_at,
-               u.id AS author_id, u.name AS author_name, u.avatar_url AS author_avatar, u.is_verified,
-               (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count
-        FROM saved_posts sp
-        JOIN posts p ON p.id = sp.post_id
-        JOIN users u ON u.id = p.user_id
-        WHERE sp.user_id = $1
-        ORDER BY sp.created_at DESC
-    `, [req.userId]);
-    res.json({ posts: result.rows });
-});
-
 module.exports = router;

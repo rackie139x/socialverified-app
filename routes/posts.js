@@ -295,4 +295,22 @@ router.post('/:id/view', requireAuth, async (req, res) => {
     res.json({ ok: true });
 });
 
+// Explore feed: recent posts that have media, ordered by popularity, for browsing
+router.get('/explore', async (req, res) => {
+    try {
+        const postsResult = await pool.query(
+            POST_SELECT + `
+            WHERE p.is_reel = FALSE AND (p.image_url IS NOT NULL OR p.video_url IS NOT NULL)
+            ORDER BY like_count DESC, p.created_at DESC
+            LIMIT 30
+        `);
+        const posts = postsResult.rows;
+        await attachCommentsAndOriginal(posts);
+        res.json({ posts });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not load explore feed' });
+    }
+});
+
 module.exports = router;

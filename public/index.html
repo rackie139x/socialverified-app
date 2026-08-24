@@ -227,17 +227,39 @@
         </div>
     </div>
 
+    <!-- Profile overflow menu: block / mute / report -->
+    <div id="profileOptionsModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Options</h3>
+                <button onclick="closeModal('profileOptionsModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <button id="profileMuteBtn" onclick="toggleMuteFromProfile()" class="w-full text-left py-3 border-b flex items-center gap-3"><i class="fas fa-volume-xmark w-5 text-gray-500"></i> Mute</button>
+            <button id="profileBlockBtn" onclick="toggleBlockFromProfile()" class="w-full text-left py-3 border-b flex items-center gap-3 text-red-500"><i class="fas fa-user-slash w-5"></i> Block</button>
+            <button onclick="closeModal('profileOptionsModal'); openReportModal('user', profileOptionsTargetId)" class="w-full text-left py-3 flex items-center gap-3 text-red-500"><i class="fas fa-flag w-5"></i> Report</button>
+        </div>
+    </div>
+
     <!-- SEARCH RESULTS -->
     <section id="searchPage" class="page">
         <div class="bg-white rounded-xl shadow p-3 mb-4">
-            <input id="searchInput" type="text" placeholder="Search people, posts, #hashtags" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') runSearch()">
+            <input id="searchInput" type="text" placeholder="Search people, posts, #hashtags" class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm" oninput="if(!this.value.trim()) showExploreDefaultView()" onkeydown="if(event.key==='Enter') runSearch()">
         </div>
-        <div class="flex gap-4 border-b mb-4 bg-white rounded-t-xl px-4 pt-3">
-            <div class="tab-btn active" data-tab="users" onclick="switchSearchTab('users')">People</div>
-            <div class="tab-btn" data-tab="posts" onclick="switchSearchTab('posts')">Posts</div>
-            <div class="tab-btn" data-tab="hashtags" onclick="switchSearchTab('hashtags')">Hashtags</div>
+        <div id="exploreDefaultView">
+            <div class="bg-white rounded-2xl shadow-lg p-4 mb-4">
+                <h3 class="font-bold text-sm text-gray-500 mb-3">Trending Hashtags</h3>
+                <div id="trendingContainer" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="exploreGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
         </div>
-        <div id="searchResults" class="space-y-3"></div>
+        <div id="searchResultsWrap" class="hidden">
+            <div class="flex gap-4 border-b mb-4 bg-white rounded-t-xl px-4 pt-3">
+                <div class="tab-btn active" data-tab="users" onclick="switchSearchTab('users')">People</div>
+                <div class="tab-btn" data-tab="posts" onclick="switchSearchTab('posts')">Posts</div>
+                <div class="tab-btn" data-tab="hashtags" onclick="switchSearchTab('hashtags')">Hashtags</div>
+            </div>
+            <div id="searchResults" class="space-y-3"></div>
+        </div>
     </section>
 
     <!-- REELS -->
@@ -320,6 +342,11 @@
         </div>
         <label class="text-sm font-medium text-gray-600">Name</label>
         <input id="editName" type="text" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1">
+        <label class="text-sm font-medium text-gray-600">Username</label>
+        <div class="flex items-center border border-gray-300 rounded-lg mb-3 mt-1 overflow-hidden">
+            <span class="px-3 text-gray-400">@</span>
+            <input id="editUsername" type="text" placeholder="username" class="flex-1 px-2 py-2 border-none">
+        </div>
         <label class="text-sm font-medium text-gray-600">Bio</label>
         <textarea id="editBio" class="w-full border border-gray-300 rounded-lg px-4 py-2 mb-3 mt-1 min-h-[70px]"></textarea>
         <label class="text-sm font-medium text-gray-600">Location</label>
@@ -669,6 +696,7 @@ function showToast(msg, type='success'){
 function switchPage(name){
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById(name+'Page').classList.add('active');
+    if (name === 'search') showExploreDefaultView();
 }
 function showFeed(){ switchPage('feed'); loadFeed(); }
 function focusComposer(){
@@ -1209,7 +1237,9 @@ async function viewProfile(userId){
             actionsEl.innerHTML = `<button onclick="openEditProfile()" class="border-2 border-primary text-primary px-4 py-2 rounded-full text-sm font-medium">Edit Profile</button>`;
         } else if (currentUser) {
             const statusData = await api(`/api/users/${userId}/follow-status`);
-            actionsEl.innerHTML = renderFollowButton(userId, statusData.status);
+            actionsEl.innerHTML = renderFollowButton(userId, statusData.status) + `
+                <button onclick="openProfileOptionsMenu(${userId})" class="w-9 h-9 rounded-full flex items-center justify-center text-gray-500"><i class="fas fa-ellipsis"></i></button>
+            `;
         } else {
             actionsEl.innerHTML = '';
         }
@@ -1269,7 +1299,7 @@ async function confirmDeleteAccount(){
 async function openSavedPosts(){
     if (!currentUser) return openModal('authModal');
     try {
-        const data = await api('/api/users/me/saved');
+        const data = await api('/api/posts/saved');
         document.getElementById('savedPostsContainer').innerHTML = data.posts.map(renderPostCard).join('') || '<p class="text-center text-gray-400 py-10">No saved posts yet.</p>';
         openModal('savedPostsModal');
     } catch (err) { showToast(err.message, 'error'); }
@@ -1301,6 +1331,34 @@ async function unblockUser(userId, btnEl){
 }
 
 // ---- Admin dashboard (visible only to admin accounts; feature is intentionally minimal for now) ----
+// ---- Profile overflow menu: block / mute / report ----
+let profileOptionsTargetId = null;
+function openProfileOptionsMenu(userId){
+    profileOptionsTargetId = userId;
+    document.getElementById('profileMuteBtn').innerHTML = '<i class="fas fa-volume-xmark w-5 text-gray-500"></i> Mute';
+    document.getElementById('profileBlockBtn').innerHTML = '<i class="fas fa-user-slash w-5"></i> Block';
+    openModal('profileOptionsModal');
+}
+
+async function toggleMuteFromProfile(){
+    try {
+        const data = await api(`/api/users/${profileOptionsTargetId}/mute`, { method: 'POST' });
+        document.getElementById('profileMuteBtn').innerHTML = data.muted
+            ? '<i class="fas fa-volume-high w-5 text-gray-500"></i> Unmute'
+            : '<i class="fas fa-volume-xmark w-5 text-gray-500"></i> Mute';
+        showToast(data.muted ? 'Muted' : 'Unmuted');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function toggleBlockFromProfile(){
+    try {
+        const data = await api(`/api/users/${profileOptionsTargetId}/block`, { method: 'POST' });
+        closeModal('profileOptionsModal');
+        showToast(data.blocked ? 'Blocked' : 'Unblocked');
+        if (data.blocked) viewProfile(profileOptionsTargetId); // refresh to show updated follow state
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
 function openAdminDashboard(){
     if (!currentUser || !currentUser.is_admin) {
         return showToast('Admin dashboard is only available to admin accounts', 'info');
@@ -1347,6 +1405,7 @@ function openEditProfile(){
     document.getElementById('editName').value = currentUser.name || '';
     api(`/api/users/${currentUser.id}`).then(data => {
         const u = data.user;
+        document.getElementById('editUsername').value = u.username || '';
         document.getElementById('editBio').value = u.bio || '';
         document.getElementById('editPrivate').checked = !!u.is_private;
         document.getElementById('editLocation').value = u.location || '';
@@ -1361,6 +1420,7 @@ function openEditProfile(){
 
 async function saveProfileEdits(){
     const name = document.getElementById('editName').value.trim();
+    const username = document.getElementById('editUsername').value.trim();
     const bio = document.getElementById('editBio').value.trim();
     const isPrivate = document.getElementById('editPrivate').checked;
     const location = document.getElementById('editLocation').value.trim();
@@ -1373,7 +1433,7 @@ async function saveProfileEdits(){
     const coverFile = document.getElementById('editCoverFile').files[0];
     try {
         await api('/api/users/me', { method: 'PUT', body: JSON.stringify({
-            name, bio, location: location || null, website: website || null,
+            name, username: username || null, bio, location: location || null, website: website || null,
             gender: gender || null, gender_privacy, birthday: birthday || null, birthday_privacy
         }) });
         await api('/api/users/me/privacy', { method: 'PUT', body: JSON.stringify({ is_private: isPrivate }) });
@@ -1395,12 +1455,33 @@ async function saveProfileEdits(){
 // ---- Search ----
 async function runSearch(){
     const q = document.getElementById('searchInput').value.trim();
-    if (!q) return;
-    switchPage('search');
+    if (!q) { showExploreDefaultView(); return; }
+    document.getElementById('exploreDefaultView').classList.add('hidden');
+    document.getElementById('searchResultsWrap').classList.remove('hidden');
     try {
         const data = await api('/api/search?q=' + encodeURIComponent(q));
         searchTabData = data;
         switchSearchTab(activeSearchTab);
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function showExploreDefaultView(){
+    document.getElementById('searchResultsWrap').classList.add('hidden');
+    document.getElementById('exploreDefaultView').classList.remove('hidden');
+    try {
+        const trendingData = await api('/api/search/trending');
+        document.getElementById('trendingContainer').innerHTML = trendingData.trending.map(t => `
+            <span class="hashtag border border-gray-100 rounded-full px-3 py-1 text-sm cursor-pointer" onclick="viewHashtag('${t.tag}')">#${escapeHtml(t.tag)} <span class="text-gray-400 text-xs">(${t.post_count})</span></span>
+        `).join('') || '<p class="text-gray-400 text-sm">No trending hashtags yet.</p>';
+
+        const exploreData = await api('/api/posts/explore');
+        document.getElementById('exploreGrid').innerHTML = exploreData.posts.map(p => `
+            <div class="relative aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer" onclick="viewProfile(${p.author_id})">
+                ${p.video_url
+                    ? `<video src="${p.video_url}" class="w-full h-full object-cover"></video><i class="fas fa-play absolute top-2 right-2 text-white text-sm"></i>`
+                    : `<img src="${p.image_url || (p.media && p.media[0])}" class="w-full h-full object-cover">`}
+            </div>
+        `).join('') || '<p class="col-span-full text-center text-gray-400 py-10">Nothing to explore yet.</p>';
     } catch (err) { showToast(err.message, 'error'); }
 }
 
