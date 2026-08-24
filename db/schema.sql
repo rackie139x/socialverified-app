@@ -189,3 +189,71 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS birthday_privacy TEXT NOT NULL DEFAUL
 -- Marks a post as an automatic "updated their profile/cover photo" timeline entry
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_profile_update BOOLEAN DEFAULT FALSE;
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS profile_update_type TEXT; -- 'avatar' | 'cover'
+
+-- Unique @username for mentions (separate from display name, which can repeat/have spaces)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT UNIQUE;
+
+-- Save / bookmark posts
+CREATE TABLE IF NOT EXISTS saved_posts (
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (user_id, post_id)
+);
+
+-- Extended reactions (love/laugh/wow/sad/angry) alongside the simple like/heart
+CREATE TABLE IF NOT EXISTS post_reactions (
+    post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    reaction TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (post_id, user_id)
+);
+
+-- Mentions: @username inside a post links to that user and notifies them
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS comment_id INTEGER;
+
+-- Reporting posts or users for moderation
+CREATE TABLE IF NOT EXISTS reports (
+    id SERIAL PRIMARY KEY,
+    reporter_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    target_type TEXT NOT NULL, -- 'post' | 'user'
+    target_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'resolved' | 'dismissed'
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Admin + moderation flags
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+
+-- Groups / communities
+CREATE TABLE IF NOT EXISTS groups (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    cover_image_url TEXT,
+    creator_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    is_private BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS group_members (
+    group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member', -- 'member' | 'admin'
+    joined_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (group_id, user_id)
+);
+
+-- Posts made inside a group show only in that group's feed, not the main feed
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE;
+
+-- Track unique post views (one row per viewer per post)
+CREATE TABLE IF NOT EXISTS post_views (
+    post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (post_id, user_id)
+);

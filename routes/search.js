@@ -66,4 +66,19 @@ router.get('/hashtag/:tag', async (req, res) => {
     }
 });
 
+// GET /api/search/trending - top hashtags overall, for the Explore page default view
+router.get('/trending', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT h.tag, COUNT(ph.post_id) AS post_count
+            FROM hashtags h JOIN post_hashtags ph ON ph.hashtag_id = h.id
+            GROUP BY h.tag ORDER BY post_count DESC LIMIT 10
+        `);
+        res.json({ trending: result.rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not load trending topics' });
+    }
+});
+
 module.exports = router;

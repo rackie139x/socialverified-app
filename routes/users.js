@@ -66,7 +66,7 @@ router.get('/:id', async (req, res) => {
     const viewerId = optionalAuth(req);
     try {
         const userResult = await pool.query(
-            `SELECT id, name, bio, avatar_url, cover_photo_url, is_verified, is_private, location, website,
+            `SELECT id, name, username, bio, avatar_url, cover_photo_url, is_verified, is_private, location, website,
                     gender, gender_privacy, birthday, birthday_privacy, created_at
              FROM users WHERE id = $1`,
             [targetId]
@@ -114,25 +114,33 @@ router.get('/:id', async (req, res) => {
 });
 
 router.put('/me', requireAuth, async (req, res) => {
-    const { name, bio, avatar_url, cover_photo_url, location, website, gender, gender_privacy, birthday, birthday_privacy } = req.body;
+    const { name, username, bio, avatar_url, cover_photo_url, location, website, gender, gender_privacy, birthday, birthday_privacy } = req.body;
     const validPrivacy = v => ['public', 'followers', 'private'].includes(v);
     try {
+        let cleanUsername = null;
+        if (username) {
+            cleanUsername = username.toLowerCase().replace(/[^a-z0-9_]/g, '');
+            if (cleanUsername.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
+            const taken = await pool.query('SELECT 1 FROM users WHERE username = $1 AND id != $2', [cleanUsername, req.userId]);
+            if (taken.rows.length > 0) return res.status(409).json({ error: 'That username is already taken' });
+        }
         const result = await pool.query(
             `UPDATE users SET
                 name = COALESCE($1, name),
-                bio = COALESCE($2, bio),
-                avatar_url = COALESCE($3, avatar_url),
-                cover_photo_url = COALESCE($4, cover_photo_url),
-                location = COALESCE($5, location),
-                website = COALESCE($6, website),
-                gender = COALESCE($7, gender),
-                gender_privacy = COALESCE($8, gender_privacy),
-                birthday = COALESCE($9, birthday),
-                birthday_privacy = COALESCE($10, birthday_privacy)
-             WHERE id = $11
-             RETURNING id, name, bio, avatar_url, cover_photo_url, location, website, gender, gender_privacy, birthday, birthday_privacy`,
+                username = COALESCE($2, username),
+                bio = COALESCE($3, bio),
+                avatar_url = COALESCE($4, avatar_url),
+                cover_photo_url = COALESCE($5, cover_photo_url),
+                location = COALESCE($6, location),
+                website = COALESCE($7, website),
+                gender = COALESCE($8, gender),
+                gender_privacy = COALESCE($9, gender_privacy),
+                birthday = COALESCE($10, birthday),
+                birthday_privacy = COALESCE($11, birthday_privacy)
+             WHERE id = $12
+             RETURNING id, name, username, bio, avatar_url, cover_photo_url, location, website, gender, gender_privacy, birthday, birthday_privacy`,
             [
-                name, bio, avatar_url, cover_photo_url, location, website,
+                name, cleanUsername, bio, avatar_url, cover_photo_url, location, website,
                 gender, validPrivacy(gender_privacy) ? gender_privacy : null,
                 birthday, validPrivacy(birthday_privacy) ? birthday_privacy : null,
                 req.userId
@@ -224,11 +232,21 @@ router.post('/:id/follow', requireAuth, async (req, res) => {
 
 router.get('/:id/follow-status', requireAuth, async (req, res) => {
     const targetId = req.params.id;
+    const blocked = await pool.query('SELECT 1 FROM blocks WHERE blocker_id = $1 AND blocked_id = $2', [req.userId, targetId]);
+    const muted = await pool.query('SELECT 1 FROM mutes WHERE muter_id = $1 AND muted_id = $2', [req.userId, targetId]);
+    const extra = { is_blocked: blocked.rows.length > 0, is_muted: muted.rows.length > 0 };
     const following = await pool.query('SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2', [req.userId, targetId]);
-    if (following.rows.length > 0) return res.json({ status: 'following' });
+    if (following.rows.length > 0) return res.json({ status: 'following', ...extra });
     const requested = await pool.query('SELECT 1 FROM follow_requests WHERE requester_id = $1 AND target_id = $2', [req.userId, targetId]);
-    if (requested.rows.length > 0) return res.json({ status: 'requested' });
-    res.json({ status: 'none' });
+    if (requested.rows.length > 0) return res.json({ status: 'requested', ...extra });
+    res.json({ status: 'none', ...extra });
+});
+
+// Look up a user by their unique @username (used to resolve @mentions to a profile)
+router.get('/by-username/:username', async (req, res) => {
+    const result = await pool.query('SELECT id, name, avatar_url FROM users WHERE username = $1', [req.params.username.toLowerCase()]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json({ user: result.rows[0] });
 });
 
 router.get('/me/follow-requests', requireAuth, async (req, res) => {
@@ -322,6 +340,60 @@ router.get('/suggestions/for-me', requireAuth, async (req, res) => {
         LIMIT 10
     `, [req.userId]);
     res.json({ suggestions: result.rows });
+});
+
+// ---- Profile tabs: Reels / Reposts / Mentions ----
+router.get('/:id/reels', async (req, res) => {
+    const result = await pool.query(`
+        SELECT p.id, p.text, p.video_url, p.created_at,
+               (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count
+        FROM posts p WHERE p.user_id = $1 AND p.is_reel = TRUE
+        ORDER BY p.created_at DESC LIMIT 30
+    `, [req.params.id]);
+    res.json({ reels: result.rows });
+});
+
+router.get('/:id/reposts', async (req, res) => {
+    const result = await pool.query(`
+        SELECT p.id, p.quote_text, p.repost_of, p.created_at
+        FROM posts p WHERE p.user_id = $1 AND p.repost_of IS NOT NULL
+        ORDER BY p.created_at DESC LIMIT 30
+    `, [req.params.id]);
+    res.json({ reposts: result.rows });
+});
+
+// Posts anywhere on the platform that @mention this user's username
+router.get('/:id/mentions', async (req, res) => {
+    try {
+        const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [req.params.id]);
+        if (!userResult.rows[0] || !userResult.rows[0].username) return res.json({ mentions: [] });
+        const username = userResult.rows[0].username;
+        const result = await pool.query(`
+            SELECT p.id, p.text, p.created_at, u.id AS author_id, u.name AS author_name
+            FROM posts p JOIN users u ON u.id = p.user_id
+            WHERE p.text ILIKE $1
+            ORDER BY p.created_at DESC LIMIT 30
+        `, [`%@${username}%`]);
+        res.json({ mentions: result.rows });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not load mentions' });
+    }
+});
+
+// ---- Saved / bookmarked posts ----
+router.get('/me/saved', requireAuth, async (req, res) => {
+    const result = await pool.query(`
+        SELECT p.id, p.text, p.image_url, p.video_url, p.created_at,
+               u.id AS author_id, u.name AS author_name, u.avatar_url AS author_avatar, u.is_verified,
+               (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS like_count
+        FROM saved_posts sp
+        JOIN posts p ON p.id = sp.post_id
+        JOIN users u ON u.id = p.user_id
+        WHERE sp.user_id = $1
+        ORDER BY sp.created_at DESC
+    `, [req.userId]);
+    res.json({ posts: result.rows });
 });
 
 module.exports = router;

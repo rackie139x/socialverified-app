@@ -8,21 +8,51 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    tailwind.config = { theme: { extend: { colors: { primary: '#4F46E5', secondary: '#818CF8', accent: '#EC4899', dark: '#1F2937' } } } }
+    tailwind.config = { theme: { extend: { colors: { primary: '#3b82f6', secondary: '#60a5fa', accent: '#EC4899', dark: '#2d3748' } } } }
 </script>
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
-    body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding-bottom: 64px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    :root {
+        --bg: #e0e5ec;
+        --text-main: #2d3748;
+        --text-light: #718096;
+        --shadow-light: #ffffff;
+        --shadow-dark: #a3b1c6;
+    }
+    body { font-family: 'Inter', sans-serif; background: var(--bg) !important; color: var(--text-main); padding-bottom: 64px; }
+
+    /* Neumorphic reskin: retarget the Tailwind utility classes already used
+       throughout the markup, so every card/button/input picks up the soft
+       embossed look automatically without touching any element's classes
+       or any of the app's JS logic. */
+    .bg-white { background: var(--bg) !important; }
+    .shadow, .shadow-lg, .shadow-xl {
+        box-shadow: 6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light) !important;
+    }
+    input, textarea, select {
+        border: none !important;
+        background: var(--bg) !important;
+        box-shadow: inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light) !important;
+    }
+    .border, .border-t, .border-b, .border-gray-200, .border-gray-300 {
+        border-color: transparent !important;
+    }
+    button.bg-primary, .bg-primary {
+        box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
+    }
+    button.bg-primary:active { box-shadow: inset 2px 2px 4px rgba(0,0,0,0.3) !important; }
+    .text-gray-400, .text-gray-500 { color: var(--text-light) !important; }
+
     .page { display: none; } .page.active { display: block; }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 16px; }
     .modal-overlay.show { display: flex; }
-    .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; position: relative; }
+    .modal-box { background: var(--bg); border-radius: 16px; padding: 24px; max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; position: relative; box-shadow: 8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light); }
     .notification-toast { position: fixed; top: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; font-weight: 500; z-index: 2100; transform: translateX(200%); transition: transform .3s ease; max-width: 320px; }
     .notification-toast.show { transform: translateX(0); }
     .post-image, .post-video { max-height: 420px; width: 100%; object-fit: cover; border-radius: 8px; }
     .carousel-dot { width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; }
     .carousel-dot.active { background: #4F46E5; }
-    .avatar { border-radius: 50%; object-fit: cover; background: linear-gradient(135deg,#4F46E5,#EC4899); display:flex; align-items:center; justify-content:center; color:white; flex-shrink:0; }
+    .avatar { border-radius: 50%; object-fit: cover; background: var(--bg); box-shadow: inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light); display:flex; align-items:center; justify-content:center; color: var(--text-light); font-weight: 700; flex-shrink:0; }
     .cover-photo { height: 160px; width: 100%; object-fit: cover; border-radius: 12px 12px 0 0; background: linear-gradient(135deg,#4F46E5,#818CF8); }
     .hashtag { color: #4F46E5; cursor: pointer; font-weight: 500; }
     .tab-btn { padding: 8px 4px; border-bottom: 2px solid transparent; color: #6b7280; font-weight: 500; cursor: pointer; }
@@ -32,8 +62,8 @@
     .contact-row:hover { background: #f9fafb; }
     .chat-messages { flex:1; padding:14px; overflow-y:auto; background:#f9fafb; min-height: 50vh; }
     .message { margin-bottom:10px; max-width:80%; }
-    .received { background:#e5e7eb; border-radius:18px 18px 18px 4px; padding:8px 12px; }
-    .sent { background:#4F46E5; color:white; border-radius:18px 18px 4px 18px; padding:8px 12px; margin-left:auto; }
+    .received { background: var(--bg); box-shadow: 3px 3px 6px var(--shadow-dark), -3px -3px 6px var(--shadow-light); border-radius:18px 18px 18px 4px; padding:8px 12px; }
+    .sent { background:#3b82f6; color:white; border-radius:18px 18px 4px 18px; padding:8px 12px; margin-left:auto; box-shadow: 2px 4px 8px rgba(59,130,246,0.4); }
     .stories-bar { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; }
     .story-circle { flex-shrink: 0; width: 66px; text-align: center; cursor: pointer; }
     .story-ring { width: 60px; height: 60px; border-radius: 50%; padding: 2px; background: linear-gradient(45deg,#f59e0b,#EC4899,#4F46E5); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
@@ -71,13 +101,16 @@
         <div id="composer" class="bg-white rounded-2xl shadow-lg p-5 mb-6 hidden">
             <textarea id="newPostText" placeholder="What's on your mind? Use #hashtags" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[70px]"></textarea>
             <div class="flex items-center justify-between mt-2">
-                <input type="file" id="newPostMedia" accept="image/*,video/*" multiple class="text-sm" onchange="handleComposerFileChange()">
+                <button onclick="document.getElementById('newPostMedia').click()" class="text-gray-500 hover:text-primary text-lg" title="Add photo or video"><i class="fas fa-photo-film"></i></button>
+                <span id="composerFileName" class="text-xs text-gray-400 flex-1 ml-2 truncate"></span>
+                <input type="file" id="newPostMedia" accept="image/*,video/*" multiple class="hidden" onchange="handleComposerFileChange()">
                 <button onclick="createPost()" class="bg-primary text-white px-5 py-2 rounded-full font-medium hover:bg-indigo-700">Post</button>
             </div>
             <label id="reelCheckboxWrap" class="hidden items-center gap-2 mt-2 text-sm text-gray-600">
                 <input type="checkbox" id="postAsReel"> Post as a Reel instead of a regular post
             </label>
         </div>
+        <div id="suggestedUsersBar"></div>
         <div id="signedOutNotice" class="bg-white rounded-2xl shadow p-5 mb-6 text-center text-gray-500">
             <a class="text-primary font-medium cursor-pointer" onclick="openModal('authModal')">Sign in</a> to post, like, comment, and follow.
         </div>
@@ -87,13 +120,17 @@
     <!-- PROFILE -->
     <section id="profilePage" class="page">
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
-            <img id="profileCover" class="cover-photo" src="" alt="">
+            <div class="relative">
+                <img id="profileCover" class="cover-photo" src="" alt="">
+                <button id="profileMenuBtn" onclick="openModal('profileMenuModal')" class="hidden absolute top-3 right-3 w-9 h-9 bg-black/40 text-white rounded-full items-center justify-center"><i class="fas fa-bars"></i></button>
+            </div>
             <div class="p-5 -mt-10">
                 <div class="flex items-end justify-between">
                     <div id="profileAvatarWrap" class="avatar w-20 h-20 border-4 border-white text-2xl"></div>
                     <div id="profileActionButtons" class="flex gap-2 mb-1"></div>
                 </div>
                 <h2 id="profileName" class="text-2xl font-bold mt-3 flex items-center gap-1"></h2>
+                <p id="profileUsername" class="text-gray-400 text-sm"></p>
                 <p id="profileBio" class="text-gray-600 mt-1"></p>
                 <div id="profileDetails"></div>
                 <div class="flex gap-6 mt-3 text-sm">
@@ -102,8 +139,93 @@
                 </div>
             </div>
         </div>
+        <div class="flex gap-4 border-b mb-4 bg-white rounded-t-xl px-4 pt-3">
+            <div class="tab-btn active" data-profiletab="posts" onclick="switchProfileTab('posts')">Posts</div>
+            <div class="tab-btn" data-profiletab="reels" onclick="switchProfileTab('reels')">Reels</div>
+            <div class="tab-btn" data-profiletab="reposts" onclick="switchProfileTab('reposts')">Reposts</div>
+        </div>
         <div id="profilePosts" class="space-y-6"></div>
     </section>
+
+    <!-- Profile hamburger menu -->
+    <div id="profileMenuModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Menu</h3>
+                <button onclick="closeModal('profileMenuModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="divide-y">
+                <button onclick="showToast('Switching accounts is coming soon', 'info')" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-people-arrows w-5 text-gray-500"></i> Switch account</button>
+                <button onclick="showToast('Adding another account is coming soon', 'info')" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-user-plus w-5 text-gray-500"></i> Add account</button>
+                <button onclick="closeModal('profileMenuModal'); openAdminDashboard()" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-chart-simple w-5 text-gray-500"></i> Dashboard</button>
+                <button onclick="closeModal('profileMenuModal'); openSavedPosts()" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-bookmark w-5 text-gray-500"></i> Saved</button>
+                <button onclick="showToast('Groups/communities are coming soon', 'info')" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-people-group w-5 text-gray-500"></i> Community / Groups</button>
+                <button onclick="closeModal('profileMenuModal'); openModal('accountSettingsModal')" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-gear w-5 text-gray-500"></i> Settings and privacy</button>
+                <button onclick="doLogout()" class="w-full text-left py-3 flex items-center gap-3 text-red-500"><i class="fas fa-arrow-right-from-bracket w-5"></i> Log out</button>
+                <a href="mailto:socialverifiedofficial@gmail.com" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-headset w-5 text-gray-500"></i> Help and support</a>
+                <button onclick="closeModal('profileMenuModal'); openModal('deleteAccountModal')" class="w-full text-left py-3 flex items-center gap-3 text-red-500"><i class="fas fa-trash w-5"></i> Delete account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete account confirmation -->
+    <div id="deleteAccountModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 class="text-xl font-bold text-red-500 mb-2">Delete Account</h3>
+            <p class="text-sm text-gray-500 mb-4">This permanently deletes your account, posts, and messages. This can't be undone. Enter your password to confirm.</p>
+            <input id="deleteAccountPassword" type="password" placeholder="Password" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+            <div class="flex gap-2">
+                <button onclick="closeModal('deleteAccountModal')" class="flex-1 border-2 border-gray-300 py-2 rounded-full font-medium">Cancel</button>
+                <button onclick="confirmDeleteAccount()" class="flex-1 bg-red-500 text-white py-2 rounded-full font-medium">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saved Posts -->
+    <div id="savedPostsModal" class="modal-overlay">
+        <div class="modal-box" style="max-width:600px;">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Saved Posts</h3>
+                <button onclick="closeModal('savedPostsModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="savedPostsContainer" class="space-y-4 max-h-[70vh] overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Account Settings (account-level privacy, separate from message settings) -->
+    <div id="accountSettingsModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Settings and Privacy</h3>
+                <button onclick="closeModal('accountSettingsModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <button onclick="closeModal('accountSettingsModal'); openEditProfile()" class="w-full text-left py-3 border-b flex items-center gap-3"><i class="fas fa-user-pen w-5 text-gray-500"></i> Edit profile</button>
+            <button onclick="closeModal('accountSettingsModal'); showBlockedUsers()" class="w-full text-left py-3 border-b flex items-center gap-3"><i class="fas fa-user-slash w-5 text-gray-500"></i> Blocked accounts</button>
+            <button onclick="closeModal('accountSettingsModal'); openModal('messageSettingsModal')" class="w-full text-left py-3 flex items-center gap-3"><i class="fas fa-comment-dots w-5 text-gray-500"></i> Message settings</button>
+        </div>
+    </div>
+
+    <!-- Blocked accounts list -->
+    <div id="blockedUsersModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Blocked Accounts</h3>
+                <button onclick="closeModal('blockedUsersModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="blockedUsersContainer" class="space-y-2"></div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboardModal" class="modal-overlay">
+        <div class="modal-box" style="max-width:600px;">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Dashboard</h3>
+                <button onclick="closeModal('adminDashboardModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="adminDashboardContent"></div>
+        </div>
+    </div>
 
     <!-- SEARCH RESULTS -->
     <section id="searchPage" class="page">
@@ -324,11 +446,11 @@
         <p id="storyCaptionOverlay" class="absolute bottom-24 left-4 right-4 text-white text-center font-medium" style="text-shadow:0 1px 4px rgba(0,0,0,.6);"></p>
     </div>
     <div class="flex justify-center gap-4 py-2" id="storyReactionBar" onclick="event.stopPropagation()">
-        <button onclick="reactToStory('❤️')" class="text-2xl">❤️</button>
-        <button onclick="reactToStory('😂')" class="text-2xl">😂</button>
-        <button onclick="reactToStory('😍')" class="text-2xl">😍</button>
-        <button onclick="reactToStory('😢')" class="text-2xl">😢</button>
-        <button onclick="reactToStory('👍')" class="text-2xl">👍</button>
+        <button onclick="reactToStory('❤️')" data-emoji="❤️" class="text-2xl">❤️</button>
+        <button onclick="reactToStory('😂')" data-emoji="😂" class="text-2xl">😂</button>
+        <button onclick="reactToStory('😍')" data-emoji="😍" class="text-2xl">😍</button>
+        <button onclick="reactToStory('😢')" data-emoji="😢" class="text-2xl">😢</button>
+        <button onclick="reactToStory('👍')" data-emoji="👍" class="text-2xl">👍</button>
     </div>
     <div class="flex p-3 gap-2" onclick="event.stopPropagation()">
         <input id="storyReplyInput" type="text" placeholder="Reply to story..." class="flex-1 bg-white/10 text-white placeholder-white/60 border border-white/30 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') sendStoryReply()">
@@ -336,6 +458,39 @@
     </div>
 </div>
 <input type="file" id="storyFileInput" accept="image/*,video/*" class="hidden" onchange="uploadStory()">
+
+<!-- Report Modal -->
+<div id="reportModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Report</h3>
+            <button onclick="closeModal('reportModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="text-sm text-gray-500 mb-3">Tell us what's wrong. Reports are reviewed for moderation.</p>
+        <textarea id="reportReasonInput" placeholder="What's the issue?" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3 min-h-[80px]"></textarea>
+        <button onclick="submitReport()" class="w-full bg-red-500 text-white py-3 rounded-full font-bold hover:bg-red-600">Submit Report</button>
+    </div>
+</div>
+
+<!-- Create Post Modal (opened from the + nav button, usable from any page) -->
+<div id="createPostModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-bold">Create Post</h3>
+            <button onclick="closeModal('createPostModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+        </div>
+        <textarea id="modalPostText" placeholder="What's on your mind? Use #hashtags and @mentions" class="w-full border border-gray-200 rounded-xl px-4 py-3 min-h-[100px] mb-3"></textarea>
+        <div class="flex items-center gap-3 mb-3">
+            <button onclick="document.getElementById('modalPostMedia').click()" class="border-2 border-primary text-primary px-4 py-2 rounded-full text-sm font-medium"><i class="fas fa-photo-film mr-1"></i> Add Photo/Video</button>
+            <span id="modalMediaFileName" class="text-xs text-gray-400"></span>
+        </div>
+        <input type="file" id="modalPostMedia" accept="image/*,video/*" multiple class="hidden" onchange="handleModalFileChange()">
+        <label id="modalReelCheckboxWrap" class="hidden items-center gap-2 mb-3 text-sm text-gray-600">
+            <input type="checkbox" id="modalPostAsReel"> Post as a Reel instead of a regular post
+        </label>
+        <button onclick="submitModalPost()" class="w-full bg-primary text-white py-3 rounded-full font-bold hover:bg-indigo-700">Post</button>
+    </div>
+</div>
 
 <!-- Photo Lightbox -->
 <div id="photoLightboxOverlay" class="story-viewer-overlay" onclick="closePhotoLightbox()">
@@ -401,7 +556,7 @@
     <button onclick="showFeed()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-home"></i></button>
     <button onclick="switchPage('search')" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-search"></i></button>
     <button onclick="showReels()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-film"></i></button>
-    <button onclick="focusComposer()" class="flex flex-col items-center bg-primary text-white w-11 h-11 rounded-full text-xl -mt-1"><i class="fas fa-plus"></i></button>
+    <button onclick="openCreatePostModal()" class="flex flex-col items-center bg-primary text-white w-11 h-11 rounded-full text-xl -mt-1"><i class="fas fa-plus"></i></button>
     <button onclick="showMessages()" class="flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2"><i class="fas fa-comment-dots"></i></button>
     <button onclick="openNotifications()" class="relative flex flex-col items-center text-gray-500 hover:text-primary text-lg px-2">
         <i class="far fa-bell"></i>
@@ -647,11 +802,113 @@ async function loadFeed(){
         const data = await api('/api/posts');
         renderPostList(data.posts, 'postsContainer');
         loadStories();
+        loadSuggestedUsers();
     } catch { showToast('Could not load feed', 'error'); }
 }
 
+async function loadSuggestedUsers(){
+    const bar = document.getElementById('suggestedUsersBar');
+    if (!currentUser) { bar.innerHTML = ''; return; }
+    try {
+        const data = await api('/api/users/suggestions/for-me');
+        if (!data.suggestions.length) { bar.innerHTML = ''; return; }
+        bar.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-lg p-4 mb-6">
+                <h4 class="font-bold text-sm text-gray-500 mb-3">Suggested for you</h4>
+                <div class="flex gap-3 overflow-x-auto">
+                    ${data.suggestions.map(u => `
+                        <div class="flex-shrink-0 w-28 text-center border border-gray-100 rounded-xl p-3">
+                            <div class="avatar w-14 h-14 text-lg mx-auto mb-2 cursor-pointer" onclick="viewProfile(${u.id})">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                            <p class="text-xs font-medium truncate">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary"></i>' : ''}</p>
+                            <button onclick="quickFollow(${u.id}, this)" class="mt-2 bg-primary text-white text-xs px-3 py-1 rounded-full w-full">Follow</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+    } catch { bar.innerHTML = ''; }
+}
+
+async function quickFollow(userId, btnEl){
+    try {
+        await api(`/api/users/${userId}/follow`, { method: 'POST' });
+        btnEl.textContent = 'Following';
+        btnEl.classList.replace('bg-primary', 'bg-gray-300');
+        btnEl.disabled = true;
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
 function linkify(text){
-    return escapeHtml(text).replace(/#(\w+)/g, '<span class="hashtag" onclick="viewHashtag(\'$1\')">#$1</span>');
+    return escapeHtml(text)
+        .replace(/#(\w+)/g, '<span class="hashtag" onclick="viewHashtag(\'$1\')">#$1</span>')
+        .replace(/@(\w+)/g, '<span class="hashtag" onclick="resolveMention(\'$1\')">@$1</span>');
+}
+
+async function resolveMention(username){
+    try {
+        const data = await api('/api/users/by-username/' + encodeURIComponent(username));
+        viewProfile(data.user.id);
+    } catch {
+        showToast('User not found', 'error');
+    }
+}
+
+// ---- Report ----
+let reportTarget = null;
+function openReportModal(targetType, targetId){
+    if (!currentUser) return openModal('authModal');
+    reportTarget = { type: targetType, id: targetId };
+    document.getElementById('reportReasonInput').value = '';
+    openModal('reportModal');
+}
+async function submitReport(){
+    const reason = document.getElementById('reportReasonInput').value.trim();
+    if (!reason) return showToast('Please describe the issue', 'error');
+    try {
+        await api('/api/reports', { method: 'POST', body: JSON.stringify({ target_type: reportTarget.type, target_id: reportTarget.id, reason }) });
+        closeModal('reportModal');
+        showToast('Report submitted. Thank you.');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Create Post Modal (opened from the + nav button, works from any page) ----
+function openCreatePostModal(){
+    if (!currentUser) return openModal('authModal');
+    document.getElementById('modalPostText').value = '';
+    document.getElementById('modalPostMedia').value = '';
+    document.getElementById('modalMediaFileName').textContent = '';
+    document.getElementById('modalPostAsReel').checked = false;
+    document.getElementById('modalReelCheckboxWrap').classList.add('hidden');
+    document.getElementById('modalReelCheckboxWrap').classList.remove('flex');
+    openModal('createPostModal');
+}
+
+function handleModalFileChange(){
+    const files = document.getElementById('modalPostMedia').files;
+    const wrap = document.getElementById('modalReelCheckboxWrap');
+    document.getElementById('modalMediaFileName').textContent = files.length ? `${files.length} file(s) selected` : '';
+    if (files.length === 1 && files[0].type.startsWith('video/')) {
+        wrap.classList.remove('hidden'); wrap.classList.add('flex');
+    } else {
+        wrap.classList.add('hidden'); wrap.classList.remove('flex');
+        document.getElementById('modalPostAsReel').checked = false;
+    }
+}
+
+async function submitModalPost(){
+    const text = document.getElementById('modalPostText').value.trim();
+    const files = document.getElementById('modalPostMedia').files;
+    const isReel = document.getElementById('modalPostAsReel').checked;
+    if (!text && files.length === 0) return showToast('Write something or add media', 'error');
+    try {
+        const form = new FormData();
+        if (text) form.append('text', text);
+        for (const f of files) form.append('media', f);
+        if (isReel) form.append('is_reel', 'true');
+        await apiForm('/api/posts', form);
+        closeModal('createPostModal');
+        showToast(isReel ? 'Reel posted!' : 'Posted!');
+        showFeed();
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
 function renderMediaBlock(p, idPrefix){
@@ -748,10 +1005,19 @@ function renderPostCard(p){
                     ${original.text ? `<p class="text-sm text-gray-600 mb-2">${linkify(original.text)}</p>` : ''}
                     ${renderMediaBlock(original, 'orig' + p.id)}
                 </div>` : ''}
-            <div class="flex items-center justify-between text-gray-500 border-t pt-3">
-                <button class="hover:text-red-500" onclick="toggleLike(${p.id})"><i class="far fa-heart"></i> ${p.like_count}</button>
+            <div class="flex items-center justify-between text-gray-500 border-t pt-3 relative">
+                <div class="relative">
+                    <button class="${p.my_reaction ? 'text-primary font-semibold' : 'hover:text-red-500'}" onclick="toggleReactionPicker(${p.id})">
+                        ${p.my_reaction ? reactionEmoji(p.my_reaction) : '<i class="far fa-heart"></i>'} ${p.like_count}
+                    </button>
+                    <div id="reactionPicker-${p.id}" class="hidden absolute bottom-full left-0 mb-2 bg-white shadow-lg rounded-full px-2 py-1 flex gap-1 z-10">
+                        ${['like','love','haha','wow','sad','angry'].map(r => `<button onclick="reactToPost(${p.id}, '${r}')" class="text-xl hover:scale-125 transition-transform">${reactionEmoji(r)}</button>`).join('')}
+                    </div>
+                </div>
                 <button class="hover:text-primary" onclick="document.getElementById('c-${p.id}').focus()"><i class="far fa-comment"></i> ${p.comments.length}</button>
                 <button class="hover:text-green-500" onclick="openShareModal(${p.id})"><i class="fas fa-retweet"></i> ${p.share_count || 0}</button>
+                <button class="${p.is_saved ? 'text-primary' : 'hover:text-primary'}" onclick="toggleSavePost(${p.id})"><i class="${p.is_saved ? 'fas' : 'far'} fa-bookmark"></i></button>
+                <button class="hover:text-gray-700" onclick="openReportModal('post', ${p.id})"><i class="fas fa-ellipsis"></i></button>
             </div>
             <div class="mt-3 space-y-2">
                 ${p.comments.map(c => `<div class="bg-gray-50 rounded-lg px-3 py-2 text-sm"><span class="font-semibold">${escapeHtml(c.author_name)}:</span> ${escapeHtml(c.text)}</div>`).join('')}
@@ -764,6 +1030,34 @@ function renderPostCard(p){
     `;
 }
 
+function reactionEmoji(type){
+    return { like: '👍', love: '❤️', haha: '😂', wow: '😮', sad: '😢', angry: '😠' }[type] || '👍';
+}
+
+function toggleReactionPicker(postId){
+    const el = document.getElementById('reactionPicker-' + postId);
+    document.querySelectorAll('[id^="reactionPicker-"]').forEach(e => { if (e !== el) e.classList.add('hidden'); });
+    el.classList.toggle('hidden');
+}
+
+async function reactToPost(postId, reaction){
+    if (!currentUser) return openModal('authModal');
+    document.getElementById('reactionPicker-' + postId).classList.add('hidden');
+    try {
+        await api(`/api/posts/${postId}/react`, { method: 'POST', body: JSON.stringify({ reaction }) });
+        refreshCurrentView();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function toggleSavePost(postId){
+    if (!currentUser) return openModal('authModal');
+    try {
+        const data = await api(`/api/posts/${postId}/save`, { method: 'POST' });
+        showToast(data.saved ? 'Saved!' : 'Removed from saved');
+        refreshCurrentView();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
 function renderPostList(posts, containerId){
     document.getElementById(containerId).innerHTML = posts.map(renderPostCard).join('') || '<p class="text-center text-gray-400 py-10">Nothing here yet.</p>';
 }
@@ -771,13 +1065,13 @@ function renderPostList(posts, containerId){
 function handleComposerFileChange(){
     const files = document.getElementById('newPostMedia').files;
     const wrap = document.getElementById('reelCheckboxWrap');
+    document.getElementById('composerFileName').textContent = files.length ? `${files.length} file(s) selected` : '';
     if (files.length === 1 && files[0].type.startsWith('video/')) {
         wrap.classList.remove('hidden'); wrap.classList.add('flex');
     } else {
         wrap.classList.add('hidden'); wrap.classList.remove('flex');
         document.getElementById('postAsReel').checked = false;
     }
-    if (files.length > 1) showToast(`${files.length} photos selected`, 'info');
 }
 
 async function createPost(){
@@ -876,6 +1170,7 @@ async function confirmShare(){
 async function viewProfile(userId){
     currentProfileId = userId;
     switchPage('profile');
+    switchProfileTab('posts', true);
     try {
         const data = await api(`/api/users/${userId}`);
         const u = data.user;
@@ -890,7 +1185,12 @@ async function viewProfile(userId){
         avatarWrap.onclick = u.avatar_url ? () => openPhotoLightbox(u.avatar_url) : null;
 
         document.getElementById('profileName').innerHTML = `${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary text-lg"></i>' : ''} ${u.is_private ? '<i class="fas fa-lock text-gray-400 text-sm"></i>' : ''}`;
+        document.getElementById('profileUsername').textContent = u.username ? '@' + u.username : '';
         document.getElementById('profileBio').textContent = u.bio || '';
+
+        const isOwnProfile = currentUser && currentUser.id === u.id;
+        document.getElementById('profileMenuBtn').classList.toggle('hidden', !isOwnProfile);
+        document.getElementById('profileMenuBtn').classList.toggle('flex', isOwnProfile);
 
         const detailParts = [];
         if (u.location) detailParts.push(`<span><i class="fas fa-location-dot mr-1"></i>${escapeHtml(u.location)}</span>`);
@@ -914,6 +1214,99 @@ async function viewProfile(userId){
             actionsEl.innerHTML = '';
         }
     } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Profile tabs (Posts / Reels / Reposts) ----
+let currentProfileTab = 'posts';
+async function switchProfileTab(tab, skipFetch){
+    currentProfileTab = tab;
+    document.querySelectorAll('[data-profiletab]').forEach(el => el.classList.toggle('active', el.dataset.profiletab === tab));
+    if (skipFetch || !currentProfileId) return;
+    const container = document.getElementById('profilePosts');
+    try {
+        if (tab === 'posts') {
+            const data = await api(`/api/users/${currentProfileId}`);
+            const u = data.user;
+            renderPostList(data.posts.map(p => ({ ...p, author_id: u.id, author_name: u.name, author_avatar: u.avatar_url, is_verified: u.is_verified, comments: p.comments || [] })), 'profilePosts');
+        } else if (tab === 'reels') {
+            const data = await api(`/api/users/${currentProfileId}/reels`);
+            container.innerHTML = data.reels.map(r => `
+                <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+                    <video src="${r.video_url}" class="w-full" style="max-height:60vh;object-fit:cover;" controls></video>
+                    ${r.text ? `<p class="p-3 text-sm">${escapeHtml(r.text)}</p>` : ''}
+                </div>
+            `).join('') || '<p class="text-center text-gray-400 py-10">No reels yet.</p>';
+        } else if (tab === 'reposts') {
+            const data = await api(`/api/users/${currentProfileId}/reposts`);
+            container.innerHTML = data.reposts.map(r => `
+                <div class="bg-white rounded-2xl shadow-lg p-4">
+                    ${r.quote_text ? `<p class="text-sm mb-2">${escapeHtml(r.quote_text)}</p>` : ''}
+                    <p class="text-xs text-gray-400">Reposted ${new Date(r.created_at).toLocaleDateString()}</p>
+                </div>
+            `).join('') || '<p class="text-center text-gray-400 py-10">No reposts yet.</p>';
+        }
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Account actions ----
+function doLogout(){
+    localStorage.removeItem('sv_token');
+    location.reload();
+}
+
+async function confirmDeleteAccount(){
+    const password = document.getElementById('deleteAccountPassword').value;
+    if (!password) return showToast('Enter your password to confirm', 'error');
+    try {
+        await api('/api/auth/me', { method: 'DELETE', body: JSON.stringify({ password }) });
+        showToast('Account deleted');
+        localStorage.removeItem('sv_token');
+        setTimeout(() => location.reload(), 1200);
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Saved posts ----
+async function openSavedPosts(){
+    if (!currentUser) return openModal('authModal');
+    try {
+        const data = await api('/api/users/me/saved');
+        document.getElementById('savedPostsContainer').innerHTML = data.posts.map(renderPostCard).join('') || '<p class="text-center text-gray-400 py-10">No saved posts yet.</p>';
+        openModal('savedPostsModal');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Blocked accounts ----
+async function showBlockedUsers(){
+    try {
+        const data = await api('/api/users/me/blocked');
+        document.getElementById('blockedUsersContainer').innerHTML = data.blocked.map(u => `
+            <div class="flex items-center justify-between p-2">
+                <div class="flex items-center gap-3">
+                    <div class="avatar w-9 h-9 text-sm">${escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                    <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
+                </div>
+                <button onclick="unblockUser(${u.id}, this)" class="text-xs text-primary font-medium">Unblock</button>
+            </div>
+        `).join('') || '<p class="text-center text-gray-400 py-6 text-sm">No blocked accounts.</p>';
+        openModal('blockedUsersModal');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function unblockUser(userId, btnEl){
+    try {
+        await api(`/api/users/${userId}/block`, { method: 'POST' });
+        btnEl.closest('div.flex.items-center.justify-between').remove();
+        showToast('Unblocked');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ---- Admin dashboard (visible only to admin accounts; feature is intentionally minimal for now) ----
+function openAdminDashboard(){
+    if (!currentUser || !currentUser.is_admin) {
+        return showToast('Admin dashboard is only available to admin accounts', 'info');
+    }
+    document.getElementById('adminDashboardContent').innerHTML = '<p class="text-center text-gray-400 py-6">Admin tools are still being built out.</p>';
+    openModal('adminDashboardModal');
 }
 
 function renderFollowButton(userId, status){
@@ -1100,6 +1493,7 @@ let storiesGrouped = [];
 let storyViewerState = { authorIndex: 0, storyIndex: 0, timer: null };
 let pendingStoryFile = null;
 let textStoryColor = '#4F46E5';
+let pendingShareStoryUrl = null;
 
 async function loadStories(){
     try {
@@ -1216,13 +1610,18 @@ function renderCurrentStory(){
     if (!story) return closeStoryViewer();
 
     document.getElementById('storyViewerAvatar').textContent = group.author_name.charAt(0).toUpperCase();
-    document.getElementById('storyViewerName').textContent = group.author_name;
+    document.getElementById('storyViewerName').innerHTML = escapeHtml(group.author_name) + (story.shared_from_name ? ` <span class="opacity-75 font-normal">shared from ${escapeHtml(story.shared_from_name)}</span>` : '');
     document.getElementById('storyCaptionOverlay').textContent = story.caption || '';
 
     // Hide your own reaction/reply controls on your own story - replying to yourself makes no sense
     const isOwnStory = currentUser && group.author_id === currentUser.id;
     document.getElementById('storyReactionBar').style.display = isOwnStory ? 'none' : 'flex';
     document.getElementById('storyReplyInput').parentElement.style.display = isOwnStory ? 'none' : 'flex';
+
+    // Highlight whichever reaction (if any) the current viewer already sent
+    document.querySelectorAll('#storyReactionBar button').forEach(btn => {
+        btn.style.transform = btn.dataset.emoji === story.my_reaction ? 'scale(1.3)' : 'scale(1)';
+    });
 
     const wrap = document.getElementById('storyMediaWrap');
     if (story.media_type === 'video') {
@@ -1273,22 +1672,25 @@ function handleStoryTap(event){
     if (isRightSide) advanceStory(); else goBackStory();
 }
 
+function currentStoryId(){
+    const group = storiesGrouped[storyViewerState.authorIndex];
+    const story = group?.stories[storyViewerState.storyIndex];
+    return story ? story.id : null;
+}
+
 function currentStoryOwnerId(){
     const group = storiesGrouped[storyViewerState.authorIndex];
     return group ? group.author_id : null;
 }
 
-// Reactions and replies to a story are delivered as an encrypted DM to the
-// story's owner - same pattern as Instagram, and it reuses the E2EE chat
-// system we already have rather than building a separate reactions store.
 async function reactToStory(emoji){
     if (!currentUser) return openModal('authModal');
-    const ownerId = currentStoryOwnerId();
-    if (!ownerId) return;
+    const storyId = currentStoryId();
+    if (!storyId) return;
     try {
-        const { ciphertext, iv } = await encryptForContact(ownerId, `${emoji} Reacted to your story`);
-        socket.emit('direct_message', { recipientId: ownerId, ciphertext, iv });
+        await api(`/api/stories/${storyId}/react`, { method: 'POST', body: JSON.stringify({ emoji }) });
         showToast('Sent!');
+        loadStories(); // refresh so the highlighted reaction updates next time this story renders
     } catch (err) { showToast(err.message, 'error'); }
 }
 
@@ -1307,16 +1709,31 @@ async function sendStoryReply(){
     } catch (err) { showToast(err.message, 'error'); }
 }
 
-let pendingShareStoryUrl = null;
+// The share icon offers two things: reshare to your own story (real backend
+// feature, resets the 24h timer and shows "shared from X"), or send a link
+// to a specific friend via DM. A tiny prompt-based chooser keeps this simple.
 function shareStory(){
     if (!currentUser) return openModal('authModal');
-    const group = storiesGrouped[storyViewerState.authorIndex];
-    const story = group?.stories[storyViewerState.storyIndex];
-    if (!story) return;
-    pendingShareStoryUrl = story.media_url || null;
-    document.getElementById('shareStoryResults').innerHTML = '';
-    document.getElementById('shareStorySearchInput').value = '';
-    openModal('shareStoryModal');
+    const storyId = currentStoryId();
+    if (!storyId) return;
+    if (confirm('Add this to your own story? (Cancel to send to a friend instead)')) {
+        reshareStoryToOwn(storyId);
+    } else {
+        const group = storiesGrouped[storyViewerState.authorIndex];
+        const story = group?.stories[storyViewerState.storyIndex];
+        pendingShareStoryUrl = story?.media_url || null;
+        document.getElementById('shareStoryResults').innerHTML = '';
+        document.getElementById('shareStorySearchInput').value = '';
+        openModal('shareStoryModal');
+    }
+}
+
+async function reshareStoryToOwn(storyId){
+    try {
+        await api(`/api/stories/${storyId}/reshare`, { method: 'POST' });
+        showToast('Added to your story!');
+        loadStories();
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
 let shareStorySearchTimeout = null;

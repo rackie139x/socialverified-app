@@ -7,6 +7,21 @@ const { sendEmail, generateCode } = require('../utils/email');
 
 const router = express.Router();
 
+// Turns a display name into a unique @username by stripping to alphanumerics
+// and appending digits if that base is already taken.
+async function generateUniqueUsername(name) {
+    const base = name.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) || 'user';
+    let candidate = base;
+    let attempt = 0;
+    while (true) {
+        const existing = await pool.query('SELECT 1 FROM users WHERE username = $1', [candidate]);
+        if (existing.rows.length === 0) return candidate;
+        attempt++;
+        candidate = base + Math.floor(Math.random() * 10000);
+        if (attempt > 20) candidate = base + Date.now(); // extremely unlikely fallback
+    }
+}
+
 router.post('/signup', async (req, res) => {
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
@@ -22,11 +37,12 @@ router.post('/signup', async (req, res) => {
         }
         const hash = await bcrypt.hash(password, 12);
         const code = generateCode();
+        const username = await generateUniqueUsername(name);
         const result = await pool.query(
-            `INSERT INTO users (name, email, password_hash, verification_code, verification_expires_at)
-             VALUES ($1, $2, $3, $4, NOW() + INTERVAL '15 minutes')
-             RETURNING id, name, email, is_verified, email_verified`,
-            [name, email.toLowerCase(), hash, code]
+            `INSERT INTO users (name, username, email, password_hash, verification_code, verification_expires_at)
+             VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '15 minutes')
+             RETURNING id, name, username, email, is_verified, email_verified`,
+            [name, username, email.toLowerCase(), hash, code]
         );
         const user = result.rows[0];
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
@@ -168,7 +184,7 @@ router.post('/login', async (req, res) => {
         const match = await bcrypt.compare(password, user.password_hash);
         if (!match) return res.status(401).json({ error: 'Invalid email or password' });
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-        res.json({ token, user: { id: user.id, name: user.name, email: user.email, is_verified: user.is_verified, email_verified: user.email_verified } });
+        res.json({ token, user: { id: user.id, name: user.name, username: user.username, email: user.email, is_verified: user.is_verified, email_verified: user.email_verified } });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Login failed' });
@@ -176,9 +192,29 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/me', requireAuth, async (req, res) => {
-    const result = await pool.query('SELECT id, name, email, is_verified, email_verified FROM users WHERE id = $1', [req.userId]);
+    const result = await pool.query('SELECT id, name, username, email, is_verified, email_verified, is_admin FROM users WHERE id = $1', [req.userId]);
     if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
     res.json({ user: result.rows[0] });
+});
+
+// Permanently deletes the account and everything tied to it (posts, messages,
+// follows, etc. all cascade via foreign keys). Requires the current password
+// as confirmation so a stolen session token alone can't nuke an account.
+router.delete('/me', requireAuth, async (req, res) => {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Password is required to delete your account' });
+    try {
+        const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.userId]);
+        const user = result.rows[0];
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        const match = await bcrypt.compare(password, user.password_hash);
+        if (!match) return res.status(401).json({ error: 'Incorrect password' });
+        await pool.query('DELETE FROM users WHERE id = $1', [req.userId]);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Could not delete account' });
+    }
 });
 
 module.exports = router;
