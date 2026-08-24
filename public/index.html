@@ -1005,6 +1005,7 @@ async function downloadMedia(url, filename){
 }
 
 function renderPostCard(p){
+    recordView(p.id);
     const isRepost = !!p.repost_of;
     const original = p.original_post;
     const profileUpdateLabel = p.is_profile_update
@@ -1017,7 +1018,7 @@ function renderPostCard(p){
                 <div class="avatar w-11 h-11 mr-3 cursor-pointer" onclick="${p.author_avatar ? `openPhotoLightbox('${p.author_avatar}')` : `viewProfile(${p.author_id})`}">${p.author_avatar ? `<img src="${p.author_avatar}" class="w-full h-full rounded-full object-cover">` : escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
                 <div class="cursor-pointer" onclick="viewProfile(${p.author_id})">
                     <h4 class="font-bold flex items-center">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary ml-1"></i>' : ''}</h4>
-                    <p class="text-xs text-gray-400">${new Date(p.created_at).toLocaleString()}</p>
+                    <p class="text-xs text-gray-400">${new Date(p.created_at).toLocaleString()} &middot; <i class="far fa-eye"></i> ${formatCount(p.view_count || 0)}</p>
                 </div>
             </div>
             ${profileUpdateLabel}
@@ -1136,20 +1137,52 @@ async function showReels(){
 function renderReels(posts){
     document.getElementById('reelsContainer').innerHTML = posts.map(p => `
         <div class="bg-black rounded-2xl overflow-hidden shadow-lg relative">
-            <video src="${p.video_url}" class="w-full" style="max-height:70vh; object-fit:cover;" controls loop playsinline></video>
+            <video src="${p.video_url}" class="w-full" style="max-height:70vh; object-fit:cover;" controls loop playsinline onplay="recordView(${p.id})"></video>
             <div class="p-4 bg-white">
-                <div class="flex items-center mb-2 cursor-pointer" onclick="viewProfile(${p.author_id})">
-                    <div class="avatar w-8 h-8 mr-2 text-xs">${escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
-                    <span class="font-semibold text-sm">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary text-xs"></i>' : ''}</span>
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center cursor-pointer" onclick="viewProfile(${p.author_id})">
+                        <div class="avatar w-8 h-8 mr-2 text-xs">${escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
+                        <span class="font-semibold text-sm">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-badge-check text-primary text-xs"></i>' : ''}</span>
+                    </div>
+                    <span class="text-xs text-gray-400"><i class="far fa-eye mr-1"></i>${formatCount(p.view_count || 0)}</span>
                 </div>
                 ${p.text ? `<p class="text-sm text-gray-700 mb-2">${linkify(p.text)}</p>` : ''}
-                <div class="flex items-center gap-5 text-gray-500 text-sm">
-                    <button class="hover:text-red-500" onclick="toggleLike(${p.id})"><i class="far fa-heart"></i> ${p.like_count}</button>
-                    <span><i class="far fa-comment"></i> ${p.comments.length}</span>
+                <div class="relative flex items-center gap-5 text-gray-500 text-sm border-t pt-3">
+                    <div class="relative">
+                        <button class="${p.my_reaction ? 'text-primary font-semibold' : 'hover:text-red-500'}" onclick="toggleReactionPicker(${p.id})">
+                            ${p.my_reaction ? reactionEmoji(p.my_reaction) : '<i class="far fa-heart"></i>'} ${p.like_count}
+                        </button>
+                        <div id="reactionPicker-${p.id}" class="hidden absolute bottom-full left-0 mb-2 bg-white shadow-lg rounded-full px-2 py-1 flex gap-1 z-10">
+                            ${['like','love','haha','wow','sad','angry'].map(r => `<button onclick="reactToPost(${p.id}, '${r}')" class="text-xl hover:scale-125 transition-transform">${reactionEmoji(r)}</button>`).join('')}
+                        </div>
+                    </div>
+                    <button class="hover:text-primary" onclick="document.getElementById('reel-c-${p.id}').focus()"><i class="far fa-comment"></i> ${p.comments.length}</button>
+                    <button class="hover:text-green-500" onclick="openShareModal(${p.id})"><i class="fas fa-retweet"></i> ${p.share_count || 0}</button>
+                    <button class="${p.is_saved ? 'text-primary' : 'hover:text-primary'}" onclick="toggleSavePost(${p.id})"><i class="${p.is_saved ? 'fas' : 'far'} fa-bookmark"></i></button>
+                </div>
+                <div class="mt-3 space-y-2">
+                    ${p.comments.map(c => `<div class="bg-gray-50 rounded-lg px-3 py-2 text-sm"><span class="font-semibold">${escapeHtml(c.author_name)}:</span> ${escapeHtml(c.text)}</div>`).join('')}
+                </div>
+                <div class="flex items-center mt-3">
+                    <input id="reel-c-${p.id}" type="text" placeholder="Write a comment..." class="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm" onkeydown="if(event.key==='Enter') addComment(${p.id})">
+                    <button onclick="addComment(${p.id})" class="ml-2 text-primary font-medium text-sm">Send</button>
                 </div>
             </div>
         </div>
     `).join('') || '<p class="text-center text-gray-400 py-10">No reels yet. Post a video and check "Post as a Reel" to be the first!</p>';
+}
+
+function formatCount(n){
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+}
+
+const viewedPosts = new Set();
+function recordView(postId){
+    if (!currentUser || viewedPosts.has(postId)) return;
+    viewedPosts.add(postId);
+    api(`/api/posts/${postId}/view`, { method: 'POST' }).catch(() => {});
 }
 
 async function toggleLike(id){
@@ -1172,8 +1205,10 @@ async function addComment(id){
 function refreshCurrentView(){
     const feedActive = document.getElementById('feedPage').classList.contains('active');
     const profileActive = document.getElementById('profilePage').classList.contains('active');
+    const reelsActive = document.getElementById('reelsPage').classList.contains('active');
     if (feedActive) loadFeed();
     else if (profileActive && currentProfileId) viewProfile(currentProfileId);
+    else if (reelsActive) showReels();
 }
 
 // ---- Share / Repost / Quote ----
