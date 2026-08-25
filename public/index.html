@@ -296,6 +296,10 @@
         </div>
         <div id="signupNameField" class="hidden">
             <input id="authName" type="text" placeholder="Display name" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
+            <div class="flex items-center border border-gray-300 rounded-lg mb-3 overflow-hidden">
+                <span class="px-3 text-gray-400">@</span>
+                <input id="authUsername" type="text" placeholder="username" class="flex-1 px-2 py-3 border-none">
+            </div>
         </div>
         <input id="authEmail" type="email" placeholder="Email" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
         <input id="authPassword" type="password" placeholder="Password (min 8 characters)" class="w-full border border-gray-300 rounded-lg px-4 py-3 mb-3">
@@ -762,9 +766,10 @@ async function submitAuth(){
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     const name = document.getElementById('authName').value.trim();
+    const username = document.getElementById('authUsername').value.trim();
     const wasSignup = authMode === 'signup';
     try {
-        const payload = authMode === 'login' ? { email, password } : { name, email, password };
+        const payload = authMode === 'login' ? { email, password } : { name, username: username || undefined, email, password };
         const data = await api('/api/auth/' + authMode, { method: 'POST', body: JSON.stringify(payload) });
         token = data.token;
         localStorage.setItem('sv_token', token);

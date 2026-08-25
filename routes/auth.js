@@ -23,7 +23,7 @@ async function generateUniqueUsername(name) {
 }
 
 router.post('/signup', async (req, res) => {
-    const { name, email, password } = req.body;
+    const { name, username, email, password } = req.body;
     if (!name || !email || !password) {
         return res.status(400).json({ error: 'Name, email, and password are required' });
     }
@@ -35,14 +35,29 @@ router.post('/signup', async (req, res) => {
         if (existing.rows.length > 0) {
             return res.status(409).json({ error: 'An account with that email already exists' });
         }
+
+        let finalUsername;
+        if (username && username.trim()) {
+            const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+            if (cleanUsername.length < 3) {
+                return res.status(400).json({ error: 'Username must be at least 3 characters (letters, numbers, underscores only)' });
+            }
+            const taken = await pool.query('SELECT 1 FROM users WHERE username = $1', [cleanUsername]);
+            if (taken.rows.length > 0) {
+                return res.status(409).json({ error: 'That username is already taken' });
+            }
+            finalUsername = cleanUsername;
+        } else {
+            finalUsername = await generateUniqueUsername(name);
+        }
+
         const hash = await bcrypt.hash(password, 12);
         const code = generateCode();
-        const username = await generateUniqueUsername(name);
         const result = await pool.query(
             `INSERT INTO users (name, username, email, password_hash, verification_code, verification_expires_at)
              VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '15 minutes')
              RETURNING id, name, username, email, is_verified, email_verified`,
-            [name, username, email.toLowerCase(), hash, code]
+            [name, finalUsername, email.toLowerCase(), hash, code]
         );
         const user = result.rows[0];
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
