@@ -205,6 +205,17 @@
         </div>
     </div>
 
+    <!-- Follow Requests -->
+    <div id="followRequestsModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Follow Requests</h3>
+                <button onclick="closeModal('followRequestsModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="followRequestsContainer" class="space-y-3"></div>
+        </div>
+    </div>
+
     <!-- Blocked accounts list -->
     <div id="blockedUsersModal" class="modal-overlay">
         <div class="modal-box">
@@ -1590,6 +1601,8 @@ function notifText(n){
     if (n.type === 'comment') return `${name} commented on your post`;
     if (n.type === 'follow') return `${name} started following you`;
     if (n.type === 'follow_request') return `${name} requested to follow you`;
+    if (n.type === 'mention') return `${name} mentioned you in a post`;
+    if (n.type === 'share') return `${name} shared your post`;
     return `${name} interacted with you`;
 }
 
@@ -1597,18 +1610,54 @@ async function openNotifications(){
     if (!currentUser) return openModal('authModal');
     switchPage('notifications');
     try {
-        const data = await api('/api/notifications');
-        document.getElementById('notificationsList').innerHTML = data.notifications.map(n => `
-            <div class="p-4 flex items-center gap-3 ${n.is_read ? '' : 'bg-indigo-50'} cursor-pointer" onclick="viewProfile(${n.actor_id})">
+        const [notifData, requestsData] = await Promise.all([
+            api('/api/notifications'),
+            api('/api/users/me/follow-requests')
+        ]);
+        const pendingCount = requestsData.requests.length;
+        const banner = pendingCount > 0 ? `
+            <div class="p-4 flex items-center justify-between bg-indigo-50 cursor-pointer" onclick="openFollowRequests()">
+                <span class="text-sm font-medium"><i class="fas fa-user-plus mr-2"></i>${pendingCount} follow request${pendingCount > 1 ? 's' : ''}</span>
+                <i class="fas fa-chevron-right text-xs text-gray-400"></i>
+            </div>` : '';
+        document.getElementById('notificationsList').innerHTML = banner + notifData.notifications.map(n => `
+            <div class="p-4 flex items-center gap-3 ${n.is_read ? '' : 'bg-indigo-50'} cursor-pointer" onclick="${n.type === 'follow_request' ? 'openFollowRequests()' : `viewProfile(${n.actor_id})`}">
                 <div class="avatar w-9 h-9 text-sm">${escapeHtml(n.actor_name).charAt(0).toUpperCase()}</div>
                 <div class="flex-1">
                     <p class="text-sm">${notifText(n)}</p>
                     <p class="text-xs text-gray-400">${new Date(n.created_at).toLocaleString()}</p>
                 </div>
             </div>
-        `).join('') || '<p class="text-center text-gray-400 py-10">No notifications yet.</p>';
+        `).join('') || (banner ? '' : '<p class="text-center text-gray-400 py-10">No notifications yet.</p>');
         await api('/api/notifications/mark-read', { method: 'POST' });
         pollNotifications();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function openFollowRequests(){
+    try {
+        const data = await api('/api/users/me/follow-requests');
+        document.getElementById('followRequestsContainer').innerHTML = data.requests.map(u => `
+            <div class="flex items-center justify-between" id="followreq-${u.id}">
+                <div class="flex items-center gap-3 cursor-pointer" onclick="closeModal('followRequestsModal'); viewProfile(${u.id})">
+                    <div class="avatar w-10 h-10 text-sm">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
+                    <span class="font-medium text-sm">${escapeHtml(u.name)}</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="respondToFollowRequest(${u.id}, 'accept')" class="bg-primary text-white text-xs px-3 py-1.5 rounded-full">Accept</button>
+                    <button onclick="respondToFollowRequest(${u.id}, 'reject')" class="bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full">Decline</button>
+                </div>
+            </div>
+        `).join('') || '<p class="text-center text-gray-400 py-6 text-sm">No pending follow requests.</p>';
+        openModal('followRequestsModal');
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function respondToFollowRequest(requesterId, action){
+    try {
+        await api(`/api/users/follow-requests/${requesterId}/${action}`, { method: 'POST' });
+        document.getElementById('followreq-' + requesterId)?.remove();
+        showToast(action === 'accept' ? 'Follow request accepted' : 'Request declined');
     } catch (err) { showToast(err.message, 'error'); }
 }
 

@@ -205,6 +205,13 @@ router.post('/:id/share', requireAuth, async (req, res) => {
             await processHashtags(result.rows[0].id, quote_text);
             await processMentions(result.rows[0].id, quote_text, req.userId);
         }
+        const originalPost = await pool.query('SELECT user_id FROM posts WHERE id = $1', [originalId]);
+        if (originalPost.rows[0] && originalPost.rows[0].user_id !== req.userId) {
+            await pool.query(
+                'INSERT INTO notifications (user_id, actor_id, type, post_id) VALUES ($1, $2, $3, $4)',
+                [originalPost.rows[0].user_id, req.userId, 'share', originalId]
+            );
+        }
         res.json({ post: result.rows[0] });
     } catch (err) {
         console.error(err);
