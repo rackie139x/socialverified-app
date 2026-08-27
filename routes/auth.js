@@ -23,12 +23,15 @@ async function generateUniqueUsername(name) {
 }
 
 router.post('/signup', async (req, res) => {
-    const { name, username, email, password } = req.body;
+    const { name, username, email, password, acceptedTerms } = req.body;
     if (!name || !email || !password) {
         return res.status(400).json({ error: 'Name, email, and password are required' });
     }
     if (password.length < 8) {
         return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+    if (!acceptedTerms) {
+        return res.status(400).json({ error: 'You must agree to the Terms of Use and Privacy Policy to sign up' });
     }
     try {
         const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
@@ -54,8 +57,8 @@ router.post('/signup', async (req, res) => {
         const hash = await bcrypt.hash(password, 12);
         const code = generateCode();
         const result = await pool.query(
-            `INSERT INTO users (name, username, email, password_hash, verification_code, verification_expires_at)
-             VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '15 minutes')
+            `INSERT INTO users (name, username, email, password_hash, verification_code, verification_expires_at, terms_accepted_at)
+             VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '15 minutes', NOW())
              RETURNING id, name, username, email, is_verified, email_verified`,
             [name, finalUsername, email.toLowerCase(), hash, code]
         );
