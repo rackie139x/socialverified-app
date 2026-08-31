@@ -16,6 +16,7 @@ const messageRoutes = require('./routes/messages');
 const storyRoutes = require('./routes/stories');
 const noteRoutes = require('./routes/notes');
 const reportRoutes = require('./routes/reports');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +34,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/stories', storyRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.use(express.static(path.join(__dirname, 'public'), { dotfiles: 'allow' }));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));

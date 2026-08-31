@@ -79,20 +79,6 @@
     .story-progress-fill { height: 100%; background: white; width: 0%; }
     ::placeholder { color: #9ca3af; }
 </style>
-<style>
-#socialverified-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 999999;
-  background: #e0e5ec url('/app_open_screen.png') center/cover no-repeat;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-#socialverified-splash.hidden {
-  display: none;
-}
-</style>
 </head>
 <body class="min-h-screen pb-10">
 
@@ -258,7 +244,7 @@
                 <h3 class="text-xl font-bold">Dashboard</h3>
                 <button onclick="closeModal('adminDashboardModal')" class="text-gray-400"><i class="fas fa-times"></i></button>
             </div>
-            <div id="adminDashboardContent"></div>
+            <div id="adminDashboardContent" class="max-h-[65vh] overflow-y-auto"></div>
         </div>
     </div>
 
@@ -1474,12 +1460,116 @@ async function toggleBlockFromProfile(){
     } catch (err) { showToast(err.message, 'error'); }
 }
 
-function openAdminDashboard(){
+async function openAdminDashboard(){
     if (!currentUser || !currentUser.is_admin) {
         return showToast('Admin dashboard is only available to admin accounts', 'info');
     }
-    document.getElementById('adminDashboardContent').innerHTML = '<p class="text-center text-gray-400 py-6">Admin tools are still being built out.</p>';
+    const container = document.getElementById('adminDashboardContent');
+    container.innerHTML = '<p class="text-center text-gray-400 py-6">Loading...</p>';
     openModal('adminDashboardModal');
+    try {
+        const stats = await api('/api/admin/stats');
+        container.innerHTML = `
+            <div class="grid grid-cols-2 gap-3 mb-5">
+                <div class="bg-gray-50 rounded-xl p-3 text-center"><p class="text-2xl font-bold text-primary">${stats.total_users}</p><p class="text-xs text-gray-500">Users</p></div>
+                <div class="bg-gray-50 rounded-xl p-3 text-center"><p class="text-2xl font-bold text-primary">${stats.total_posts}</p><p class="text-xs text-gray-500">Posts</p></div>
+                <div class="bg-gray-50 rounded-xl p-3 text-center"><p class="text-2xl font-bold text-red-500">${stats.pending_reports}</p><p class="text-xs text-gray-500">Pending Reports</p></div>
+                <div class="bg-gray-50 rounded-xl p-3 text-center"><p class="text-2xl font-bold text-gray-700">${stats.banned_users}</p><p class="text-xs text-gray-500">Banned</p></div>
+            </div>
+            <div class="flex gap-4 border-b mb-4">
+                <div class="tab-btn active" data-admintab="reports" onclick="switchAdminTab('reports')">Reports</div>
+                <div class="tab-btn" data-admintab="users" onclick="switchAdminTab('users')">Users</div>
+            </div>
+            <div id="adminReportsPanel"></div>
+            <div id="adminUsersPanel" class="hidden">
+                <input id="adminUserSearch" type="text" placeholder="Search by name, username, or email..." class="w-full border border-gray-200 rounded-full px-4 py-2 text-sm mb-3" onkeydown="if(event.key==='Enter') searchAdminUsers()">
+                <div id="adminUsersResults" class="space-y-2"></div>
+            </div>
+        `;
+        loadAdminReports();
+    } catch (err) { container.innerHTML = `<p class="text-center text-red-400 py-6">${escapeHtml(err.message)}</p>`; }
+}
+
+function switchAdminTab(tab){
+    document.querySelectorAll('[data-admintab]').forEach(el => el.classList.toggle('active', el.dataset.admintab === tab));
+    document.getElementById('adminReportsPanel').classList.toggle('hidden', tab !== 'reports');
+    document.getElementById('adminUsersPanel').classList.toggle('hidden', tab !== 'users');
+}
+
+async function loadAdminReports(){
+    const panel = document.getElementById('adminReportsPanel');
+    panel.innerHTML = '<p class="text-center text-gray-400 py-4 text-sm">Loading reports...</p>';
+    try {
+        const data = await api('/api/admin/reports');
+        panel.innerHTML = data.reports.map(r => {
+            const targetDesc = r.target_type === 'post'
+                ? (r.target ? `Post by ${escapeHtml(r.target.author_name)}: "${escapeHtml((r.target.text || '(no text)').slice(0, 80))}"` : 'Post no longer exists')
+                : (r.target ? `Account: ${escapeHtml(r.target.name)} (${escapeHtml(r.target.email)})` : 'User no longer exists');
+            return `
+                <div class="border border-gray-100 rounded-xl p-3 mb-3 text-sm">
+                    <p class="text-xs text-gray-400 mb-1">Reported by ${escapeHtml(r.reporter_name)} &middot; ${new Date(r.created_at).toLocaleDateString()}</p>
+                    <p class="font-medium mb-1">${targetDesc}</p>
+                    <p class="text-gray-600 mb-2">"${escapeHtml(r.reason)}"</p>
+                    <div class="flex gap-2 flex-wrap">
+                        ${r.target_type === 'post' && r.target ? `<button onclick="adminDeletePost(${r.target.id}, ${r.id})" class="bg-red-500 text-white text-xs px-3 py-1.5 rounded-full">Delete Post</button>` : ''}
+                        ${r.target_type === 'user' && r.target ? `<button onclick="adminToggleBan(${r.target.id})" class="bg-red-500 text-white text-xs px-3 py-1.5 rounded-full">${r.target.is_banned ? 'Unban' : 'Ban'} User</button>` : ''}
+                        <button onclick="adminResolveReport(${r.id})" class="bg-gray-200 text-gray-700 text-xs px-3 py-1.5 rounded-full">Resolve</button>
+                        <button onclick="adminDismissReport(${r.id})" class="bg-gray-100 text-gray-500 text-xs px-3 py-1.5 rounded-full">Dismiss</button>
+                    </div>
+                </div>
+            `;
+        }).join('') || '<p class="text-center text-gray-400 py-6 text-sm">No pending reports.</p>';
+    } catch (err) { panel.innerHTML = `<p class="text-center text-red-400 py-4 text-sm">${escapeHtml(err.message)}</p>`; }
+}
+
+async function adminResolveReport(id){
+    try { await api(`/api/admin/reports/${id}/resolve`, { method: 'POST' }); showToast('Report resolved'); loadAdminReports(); }
+    catch (err) { showToast(err.message, 'error'); }
+}
+async function adminDismissReport(id){
+    try { await api(`/api/admin/reports/${id}/dismiss`, { method: 'POST' }); showToast('Report dismissed'); loadAdminReports(); }
+    catch (err) { showToast(err.message, 'error'); }
+}
+async function adminDeletePost(postId){
+    if (!confirm('Permanently delete this post?')) return;
+    try { await api(`/api/admin/posts/${postId}`, { method: 'DELETE' }); showToast('Post deleted'); loadAdminReports(); }
+    catch (err) { showToast(err.message, 'error'); }
+}
+async function adminToggleBan(userId){
+    try {
+        const data = await api(`/api/admin/users/${userId}/ban`, { method: 'POST' });
+        showToast(data.is_banned ? 'User banned' : 'User unbanned');
+        loadAdminReports();
+        if (!document.getElementById('adminUsersPanel').classList.contains('hidden')) searchAdminUsers();
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function searchAdminUsers(){
+    const q = document.getElementById('adminUserSearch').value.trim();
+    const resultsEl = document.getElementById('adminUsersResults');
+    try {
+        const data = await api('/api/admin/users?q=' + encodeURIComponent(q));
+        resultsEl.innerHTML = data.users.map(u => `
+            <div class="border border-gray-100 rounded-xl p-3 flex items-center justify-between text-sm">
+                <div>
+                    <p class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-badge-check text-primary text-xs"></i>' : ''} ${u.is_banned ? '<span class="text-red-500 text-xs">(banned)</span>' : ''}</p>
+                    <p class="text-xs text-gray-400">${escapeHtml(u.email)}</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="adminToggleVerify(${u.id})" class="bg-primary text-white text-xs px-3 py-1.5 rounded-full">${u.is_verified ? 'Unverify' : 'Verify'}</button>
+                    <button onclick="adminToggleBan(${u.id})" class="bg-red-500 text-white text-xs px-3 py-1.5 rounded-full">${u.is_banned ? 'Unban' : 'Ban'}</button>
+                </div>
+            </div>
+        `).join('') || '<p class="text-center text-gray-400 py-4 text-sm">No matching users.</p>';
+    } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function adminToggleVerify(userId){
+    try {
+        const data = await api(`/api/admin/users/${userId}/verify`, { method: 'POST' });
+        showToast(data.is_verified ? 'Verification badge granted' : 'Verification badge removed');
+        searchAdminUsers();
+    } catch (err) { showToast(err.message, 'error'); }
 }
 
 function renderFollowButton(userId, status){

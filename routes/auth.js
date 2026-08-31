@@ -201,6 +201,7 @@ router.post('/login', async (req, res) => {
         if (!user) return res.status(401).json({ error: 'Invalid email or password' });
         const match = await bcrypt.compare(password, user.password_hash);
         if (!match) return res.status(401).json({ error: 'Invalid email or password' });
+        if (user.is_banned) return res.status(403).json({ error: 'This account has been suspended for violating our Terms of Use' });
         const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '30d' });
         res.json({ token, user: { id: user.id, name: user.name, username: user.username, email: user.email, is_verified: user.is_verified, email_verified: user.email_verified } });
     } catch (err) {
