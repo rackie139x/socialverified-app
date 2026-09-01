@@ -251,6 +251,14 @@ CREATE TABLE IF NOT EXISTS group_members (
 -- Posts made inside a group show only in that group's feed, not the main feed
 ALTER TABLE posts ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE;
 
+-- Join requests for private groups (public groups skip this - instant join)
+CREATE TABLE IF NOT EXISTS group_join_requests (
+    group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (group_id, user_id)
+);
+
 -- Track unique post views (one row per viewer per post)
 CREATE TABLE IF NOT EXISTS post_views (
     post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,

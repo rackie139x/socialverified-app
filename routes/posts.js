@@ -101,7 +101,7 @@ async function attachCommentsAndOriginal(posts, viewerId) {
 // get personalized my_reaction/is_saved fields.
 router.get('/', optionalAuth, async (req, res) => {
     try {
-        const postsResult = await pool.query(POST_SELECT + ' WHERE p.is_reel = FALSE ORDER BY p.created_at DESC LIMIT 50');
+        const postsResult = await pool.query(POST_SELECT + ' WHERE p.is_reel = FALSE AND p.group_id IS NULL ORDER BY p.created_at DESC LIMIT 50');
         const posts = postsResult.rows;
         await attachCommentsAndOriginal(posts, req.userId);
         res.json({ posts });
