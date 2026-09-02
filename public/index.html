@@ -739,6 +739,25 @@ function openModal(id){ document.getElementById(id).classList.add('show'); }
 function closeModal(id){ document.getElementById(id).classList.remove('show'); }
 function escapeHtml(str){ const d=document.createElement('div'); d.textContent = str||''; return d.innerHTML; }
 
+// Verified badge: an 8-point scalloped "seal" shape (built from 8 overlapping
+// rounded squares rotated evenly), matching the classic verified-checkmark
+// look rather than a plain circle. sizePx controls the rendered width/height.
+function verifiedBadge(sizePx = 16, extraClass = ''){
+    return `<svg class="inline-block align-middle ${extraClass}" width="${sizePx}" height="${sizePx}" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <g fill="currentColor">
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(0 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(45 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(90 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(135 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(180 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(225 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(270 20 20)"/>
+            <rect x="7" y="7" width="26" height="26" rx="6" transform="rotate(315 20 20)"/>
+        </g>
+        <path d="M15.5 20.5l3 3 6.5-7" stroke="white" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+}
+
 function showToast(msg, type='success'){
     const colors = { success:'#10b981', error:'#ef4444', info:'#4F46E5' };
     const el = document.createElement('div');
@@ -913,7 +932,7 @@ async function loadSuggestedUsers(){
                     ${data.suggestions.map(u => `
                         <div class="flex-shrink-0 w-28 text-center border border-gray-100 rounded-xl p-3">
                             <div class="avatar w-14 h-14 text-lg mx-auto mb-2 cursor-pointer" onclick="viewProfile(${u.id})">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
-                            <p class="text-xs font-medium truncate">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-circle-check text-primary"></i>' : ''}</p>
+                            <p class="text-xs font-medium truncate">${escapeHtml(u.name)} ${u.is_verified ? verifiedBadge(14, 'text-primary') : ''}</p>
                             <button onclick="quickFollow(${u.id}, this)" class="mt-2 bg-primary text-white text-xs px-3 py-1 rounded-full w-full">Follow</button>
                         </div>
                     `).join('')}
@@ -1083,7 +1102,7 @@ function renderPostCard(p){
             <div class="flex items-center mb-3">
                 <div class="avatar w-11 h-11 mr-3 cursor-pointer" onclick="${p.author_avatar ? `openPhotoLightbox('${p.author_avatar}')` : `viewProfile(${p.author_id})`}">${p.author_avatar ? `<img src="${p.author_avatar}" class="w-full h-full rounded-full object-cover">` : escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
                 <div class="cursor-pointer" onclick="viewProfile(${p.author_id})">
-                    <h4 class="font-bold flex items-center">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-circle-check text-primary ml-1"></i>' : ''}</h4>
+                    <h4 class="font-bold flex items-center">${escapeHtml(p.author_name)} ${p.is_verified ? verifiedBadge(15, 'text-primary ml-1') : ''}</h4>
                     <p class="text-xs text-gray-400">${new Date(p.created_at).toLocaleString()} &middot; <i class="far fa-eye"></i> ${formatCount(p.view_count || 0)}</p>
                 </div>
             </div>
@@ -1208,7 +1227,7 @@ function renderReels(posts){
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center cursor-pointer" onclick="viewProfile(${p.author_id})">
                         <div class="avatar w-8 h-8 mr-2 text-xs">${escapeHtml(p.author_name).charAt(0).toUpperCase()}</div>
-                        <span class="font-semibold text-sm">${escapeHtml(p.author_name)} ${p.is_verified ? '<i class="fas fa-circle-check text-primary text-xs"></i>' : ''}</span>
+                        <span class="font-semibold text-sm">${escapeHtml(p.author_name)} ${p.is_verified ? verifiedBadge(13, 'text-primary') : ''}</span>
                     </div>
                     <span class="text-xs text-gray-400"><i class="far fa-eye mr-1"></i>${formatCount(p.view_count || 0)}</span>
                 </div>
@@ -1313,7 +1332,7 @@ async function viewProfile(userId){
         avatarWrap.style.cursor = u.avatar_url ? 'pointer' : 'default';
         avatarWrap.onclick = u.avatar_url ? () => openPhotoLightbox(u.avatar_url) : null;
 
-        document.getElementById('profileName').innerHTML = `${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-circle-check text-primary text-lg"></i>' : ''} ${u.is_private ? '<i class="fas fa-lock text-gray-400 text-sm"></i>' : ''}`;
+        document.getElementById('profileName').innerHTML = `${escapeHtml(u.name)} ${u.is_verified ? verifiedBadge(20, 'text-primary') : ''} ${u.is_private ? '<i class="fas fa-lock text-gray-400 text-sm"></i>' : ''}`;
         document.getElementById('profileUsername').textContent = u.username ? '@' + u.username : '';
         document.getElementById('profileBio').textContent = u.bio || '';
 
@@ -1552,7 +1571,7 @@ async function searchAdminUsers(){
         resultsEl.innerHTML = data.users.map(u => `
             <div class="border border-gray-100 rounded-xl p-3 flex items-center justify-between text-sm">
                 <div>
-                    <p class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-circle-check text-primary text-xs"></i>' : ''} ${u.is_banned ? '<span class="text-red-500 text-xs">(banned)</span>' : ''}</p>
+                    <p class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? verifiedBadge(13, 'text-primary') : ''} ${u.is_banned ? '<span class="text-red-500 text-xs">(banned)</span>' : ''}</p>
                     <p class="text-xs text-gray-400">${escapeHtml(u.email)}</p>
                 </div>
                 <div class="flex gap-2">
@@ -1598,7 +1617,7 @@ async function openFollowList(type){
         document.getElementById('followListContent').innerHTML = list.map(u => `
             <div class="flex items-center gap-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg" onclick="closeModal('followListModal'); viewProfile(${u.id})">
                 <div class="avatar w-10 h-10">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
-                <span class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-circle-check text-primary text-xs"></i>' : ''}</span>
+                <span class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? verifiedBadge(13, 'text-primary') : ''}</span>
             </div>
         `).join('') || '<p class="text-gray-400 text-sm text-center py-4">Nobody yet.</p>';
         openModal('followListModal');
@@ -1698,7 +1717,7 @@ function switchSearchTab(tab){
         container.innerHTML = (searchTabData.users || []).map(u => `
             <div class="bg-white rounded-xl shadow p-4 flex items-center gap-3 cursor-pointer" onclick="viewProfile(${u.id})">
                 <div class="avatar w-10 h-10">${u.avatar_url ? `<img src="${u.avatar_url}" class="w-full h-full rounded-full object-cover">` : escapeHtml(u.name).charAt(0).toUpperCase()}</div>
-                <span class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? '<i class="fas fa-circle-check text-primary text-xs"></i>' : ''}</span>
+                <span class="font-medium">${escapeHtml(u.name)} ${u.is_verified ? verifiedBadge(13, 'text-primary') : ''}</span>
             </div>
         `).join('') || '<p class="text-gray-400 text-center py-6">No people found.</p>';
     } else if (tab === 'posts') {
